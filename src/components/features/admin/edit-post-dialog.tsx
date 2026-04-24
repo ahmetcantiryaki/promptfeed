@@ -1,0 +1,528 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import * as Dialog from "@radix-ui/react-dialog";
+import { X, Loader2, Upload, Trash2, Plus, Wand2 } from "lucide-react";
+import { toast } from "sonner";
+import type { Post } from "@/types/domain";
+import { createClient } from "@/lib/supabase/browser";
+import {
+  updatePost,
+  uploadReplacementImage,
+  type UpdatePostInput,
+} from "@/lib/admin-post-actions";
+import { PrettySelect, type SelectOption } from "@/components/ui/select";
+import { BrandSquare } from "@/components/ui/brand-square";
+import { modelVisual } from "@/lib/brand";
+import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
+import { cn } from "@/lib/utils";
+
+interface ModelOpt {
+  slug: string;
+  name: string;
+}
+interface PlatformOpt {
+  slug: string;
+  name: string;
+}
+
+interface ImageSlot {
+  /** Existing remote URL (kept if no new file is chosen). */
+  url: string | null;
+  /** Newly chosen file to upload. */
+  file: File | null;
+  /** Local preview URL (object URL when file is set, otherwise the remote URL). */
+  preview: string | null;
+}
+
+interface Props {
+  post: Post;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Called after a successful save; parent can refresh local state. */
+  onSaved?: () => void;
+}
+
+const EXTRA_LIMIT = 3;
+
+function makeSlot(url: string | null): ImageSlot {
+  return { url, file: null, preview: url };
+}
+
+export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
+  const router = useRouter();
+  const isRemix = post.prompt_type === "remix";
+
+  const [userId, setUserId] = useState<string | null>(null);
+  const [models, setModels] = useState<ModelOpt[]>([]);
+  const [platforms, setPlatforms] = useState<PlatformOpt[]>([]);
+
+  const [prompt, setPrompt] = useState(post.prompt);
+  const [modelSlug, setModelSlug] = useState(post.model_slug);
+  const [platformSlug, setPlatformSlug] = useState(post.platform_slug);
+  const [extHandle, setExtHandle] = useState(
+    post.external_creator_handle ?? "",
+  );
+  const [extUrl, setExtUrl] = useState(post.external_creator_url ?? "");
+  const [extPlatform, setExtPlatform] = useState(
+    post.external_creator_platform ?? "",
+  );
+
+  const [main, setMain] = useState<ImageSlot>(makeSlot(post.media_url));
+  const [source, setSource] = useState<ImageSlot>(
+    makeSlot(post.source_image_url ?? null),
+  );
+  const [extras, setExtras] = useState<ImageSlot[]>(
+    (post.extra_image_urls ?? []).map(makeSlot),
+  );
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Track object URLs we created so we can revoke them on unmount/reset.
+  const objectUrlsRef = useRef<string[]>([]);
+
+  // Reset whenever a different post is opened.
+  useEffect(() => {
+    if (!open) return;
+    setPrompt(post.prompt);
+    setModelSlug(post.model_slug);
+    setPlatformSlug(post.platform_slug);
+    setExtHandle(post.external_creator_handle ?? "");
+    setExtUrl(post.external_creator_url ?? "");
+    setExtPlatform(post.external_creator_platform ?? "");
+    setMain(makeSlot(post.media_url));
+    setSource(makeSlot(post.source_image_url ?? null));
+    setExtras((post.extra_image_urls ?? []).map(makeSlot));
+    setError(null);
+  }, [open, post]);
+
+  // Revoke any object URLs when the dialog closes or unmounts.
+  useEffect(() => {
+    if (open) return;
+    objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+    objectUrlsRef.current = [];
+  }, [open]);
+
+  // Lazy-load model/platform options + current user id the first time we open.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const [m, p, auth] = await Promise.all([
+        models.length > 0
+          ? Promise.resolve({ data: null })
+          : supabase.from("models").select("slug, name").order("name"),
+        platforms.length > 0
+          ? Promise.resolve({ data: null })
+          : supabase.from("platforms").select("slug, name").order("name"),
+        userId ? Promise.resolve({ data: { user: { id: userId } } }) : supabase.auth.getUser(),
+      ]);
+      if (cancelled) return;
+      if (m.data) setModels(m.data as ModelOpt[]);
+      if (p.data) setPlatforms(p.data as PlatformOpt[]);
+      if (auth.data?.user?.id) setUserId(auth.data.user.id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, models.length, platforms.length, userId]);
+
+  const modelOptions: SelectOption<string>[] = models.map((m) => ({
+    value: m.slug,
+    label: m.name,
+    icon: <BrandSquare visual={modelVisual(m.slug)} size={18} />,
+  }));
+  const platformOptions: SelectOption<string>[] = platforms.map((p) => ({
+    value: p.slug,
+    label: p.name,
+    icon: isPlatformSlug(p.slug) ? (
+      <PlatformBadge platform={p.slug} size={18} rounded={4} />
+    ) : (
+      <span className="h-[18px] w-[18px] rounded-[4px] bg-surface-2" />
+    ),
+  }));
+
+  function pickFile(setter: (slot: ImageSlot) => void, currentUrl: string | null) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = () => {
+      const f = input.files?.[0];
+      if (!f) return;
+      const preview = URL.createObjectURL(f);
+      objectUrlsRef.current.push(preview);
+      setter({ url: currentUrl, file: f, preview });
+    };
+    input.click();
+  }
+
+  function replaceMain() {
+    pickFile(setMain, main.url);
+  }
+  function replaceSource() {
+    pickFile(setSource, source.url);
+  }
+  function replaceExtra(i: number) {
+    pickFile((slot) => {
+      setExtras((prev) => prev.map((s, j) => (j === i ? slot : s)));
+    }, extras[i]?.url ?? null);
+  }
+  function removeExtra(i: number) {
+    setExtras((prev) => prev.filter((_, j) => j !== i));
+  }
+  function addExtra() {
+    if (extras.length >= EXTRA_LIMIT) return;
+    pickFile((slot) => {
+      setExtras((prev) => [...prev, slot]);
+    }, null);
+  }
+
+  async function save() {
+    setError(null);
+    if (prompt.trim().length < 6) {
+      setError("Prompt en az 6 karakter olmalı.");
+      return;
+    }
+    if (!userId) {
+      setError("Görsel yüklemek için giriş yapmış olmalısın.");
+      return;
+    }
+    if (!main.preview) {
+      setError("Ana görsel boş olamaz.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const patch: UpdatePostInput = {
+        prompt: prompt.trim(),
+        model_slug: modelSlug,
+        platform_slug: platformSlug,
+        external_creator_handle: extHandle.trim() || null,
+        external_creator_url: extUrl.trim() || null,
+        external_creator_platform: extPlatform || null,
+      };
+
+      if (main.file) {
+        const url = await uploadReplacementImage(
+          userId,
+          post.id,
+          "out",
+          main.file,
+        );
+        patch.media_url = url;
+        patch.thumbnail_url = url;
+      }
+
+      if (isRemix) {
+        if (source.file) {
+          const url = await uploadReplacementImage(
+            userId,
+            post.id,
+            "in",
+            source.file,
+          );
+          patch.source_image_url = url;
+        } else if (source.url === null) {
+          patch.source_image_url = null;
+        }
+      }
+
+      // Rebuild the extras array preserving order.
+      const newExtras: string[] = [];
+      for (let i = 0; i < extras.length; i++) {
+        const e = extras[i]!;
+        if (e.file) {
+          const url = await uploadReplacementImage(
+            userId,
+            post.id,
+            `x${i + 1}`,
+            e.file,
+          );
+          newExtras.push(url);
+        } else if (e.url) {
+          newExtras.push(e.url);
+        }
+      }
+      patch.extra_image_urls = newExtras;
+
+      await updatePost(post.id, patch);
+      toast.success("Prompt güncellendi");
+      onSaved?.();
+      onOpenChange(false);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Güncelleme başarısız");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-md" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 z-[90] flex max-h-[92vh] w-[min(96vw,820px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[14px] border bg-surface shadow-2xl outline-none"
+          aria-describedby={undefined}
+        >
+          <div className="flex items-center justify-between border-b px-5 py-3.5">
+            <Dialog.Title className="text-[15px] font-semibold tracking-tight text-text">
+              Promptu düzenle
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                aria-label="Close"
+                className="grid h-8 w-8 place-items-center rounded-full text-text-muted hover:bg-hover hover:text-text"
+              >
+                <X className="h-4 w-4" strokeWidth={2} />
+              </button>
+            </Dialog.Close>
+          </div>
+
+          <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
+            {/* Images section */}
+            <section className="flex flex-col gap-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+                Görseller
+              </div>
+              <div
+                className={cn(
+                  "grid gap-3",
+                  isRemix ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2",
+                )}
+              >
+                <ImageEditorCard
+                  label={isRemix ? "Output (sonuç)" : "Ana görsel"}
+                  preview={main.preview}
+                  onReplace={replaceMain}
+                />
+                {isRemix ? (
+                  <ImageEditorCard
+                    label="Input (kaynak)"
+                    badge={<Wand2 className="h-3 w-3" strokeWidth={2} />}
+                    preview={source.preview}
+                    onReplace={replaceSource}
+                  />
+                ) : null}
+              </div>
+
+              {!isRemix ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-medium text-text-muted">
+                      Ekstra görseller{" "}
+                      <span className="text-text-subtle">
+                        ({extras.length}/{EXTRA_LIMIT})
+                      </span>
+                    </div>
+                    {extras.length < EXTRA_LIMIT ? (
+                      <button
+                        type="button"
+                        onClick={addExtra}
+                        className="inline-flex items-center gap-1 rounded-[8px] border bg-surface px-2.5 py-1 text-[12px] font-medium text-text-muted hover:bg-hover hover:text-text"
+                      >
+                        <Plus className="h-3 w-3" strokeWidth={2} />
+                        Ekle
+                      </button>
+                    ) : null}
+                  </div>
+                  {extras.length === 0 ? (
+                    <p className="text-[12px] text-text-subtle">
+                      Bu prompt için ekstra görsel yok.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {extras.map((e, i) => (
+                        <ImageEditorCard
+                          key={i}
+                          label={`#${i + 1}`}
+                          preview={e.preview}
+                          onReplace={() => replaceExtra(i)}
+                          onRemove={() => removeExtra(i)}
+                          compact
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </section>
+
+            {/* Text section */}
+            <Field label="Prompt">
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={5}
+                className="w-full resize-y rounded-[10px] border bg-surface-2 px-3 py-2.5 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+              />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Model">
+                <PrettySelect
+                  value={modelSlug}
+                  onValueChange={setModelSlug}
+                  options={modelOptions}
+                  ariaLabel="Model"
+                />
+              </Field>
+              <Field label="Platform">
+                <PrettySelect
+                  value={platformSlug}
+                  onValueChange={setPlatformSlug}
+                  options={platformOptions}
+                  ariaLabel="Platform"
+                />
+              </Field>
+            </div>
+
+            <Field label="Original creator handle (opsiyonel)">
+              <input
+                value={extHandle}
+                onChange={(e) => setExtHandle(e.target.value)}
+                placeholder="@someone"
+                className="w-full rounded-[10px] border bg-surface-2 px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+              />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Creator URL">
+                <input
+                  value={extUrl}
+                  onChange={(e) => setExtUrl(e.target.value)}
+                  placeholder="https://…"
+                  className="w-full rounded-[10px] border bg-surface-2 px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                />
+              </Field>
+              <Field label="Creator platform">
+                <input
+                  value={extPlatform}
+                  onChange={(e) => setExtPlatform(e.target.value)}
+                  placeholder="x, instagram…"
+                  className="w-full rounded-[10px] border bg-surface-2 px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                />
+              </Field>
+            </div>
+
+            {error ? (
+              <div className="rounded-[10px] border border-red-500/40 bg-red-500/10 px-3 py-2 text-[12px] text-red-500">
+                {error}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 border-t bg-surface-2/40 px-5 py-3">
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                className="rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted hover:bg-hover hover:text-text"
+              >
+                Vazgeç
+              </button>
+            </Dialog.Close>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-[10px] border border-accent bg-accent px-3.5 py-2 text-[13px] font-semibold text-accent-fg hover:opacity-90 disabled:opacity-60"
+            >
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : null}
+              Kaydet
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+interface ImageEditorCardProps {
+  label: string;
+  preview: string | null;
+  onReplace: () => void;
+  onRemove?: () => void;
+  badge?: React.ReactNode;
+  compact?: boolean;
+}
+
+function ImageEditorCard({
+  label,
+  preview,
+  onReplace,
+  onRemove,
+  badge,
+  compact,
+}: ImageEditorCardProps) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+        {badge}
+        {label}
+      </div>
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-[10px] border bg-surface-2",
+          compact ? "aspect-square" : "aspect-[4/3]",
+        )}
+      >
+        {preview ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={preview}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center text-[11px] text-text-subtle">
+            Görsel yok
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onReplace}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border bg-surface px-2.5 py-1.5 text-[12px] font-medium text-text-muted hover:bg-hover hover:text-text"
+        >
+          <Upload className="h-3 w-3" strokeWidth={2} />
+          {preview ? "Değiştir" : "Yükle"}
+        </button>
+        {onRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Kaldır"
+            className="grid h-7 w-7 place-items-center rounded-[8px] border bg-surface text-text-muted hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-500"
+          >
+            <Trash2 className="h-3 w-3" strokeWidth={2} />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}

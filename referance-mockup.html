@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PromptFeed — AI İçerik Keşif Platformu</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f5;
+    --border: #e4e4e7;
+    --border-strong: #d4d4d8;
+    --text: #18181b;
+    --text-muted: #71717a;
+    --text-subtle: #a1a1aa;
+    --label: #a1a1aa;
+    --accent: #18181b;
+    --accent-fg: #ffffff;
+    --hover: #f4f4f5;
+    --shadow: 0 1px 2px rgba(0,0,0,0.04);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  [data-theme="dark"] {
+    --bg: #0a0a0a;
+    --surface: #111113;
+    --surface-2: #18181b;
+    --border: #27272a;
+    --border-strong: #3f3f46;
+    --text: #fafafa;
+    --text-muted: #a1a1aa;
+    --text-subtle: #71717a;
+    --label: #71717a;
+    --accent: #fafafa;
+    --accent-fg: #0a0a0a;
+    --hover: #1c1c1f;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ============ LAYOUT ============ */
+  .app {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+  }
+  .logo-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .logo-text { font-weight: 600; font-size: 16px; letter-spacing: -0.01em; }
+
+  .nav-group { display: flex; flex-direction: column; gap: 2px; }
+  .nav-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--label);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 8px;
+    margin-bottom: 8px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.12s ease;
+    text-decoration: none;
+  }
+  .nav-item:hover { background: var(--hover); color: var(--text); }
+  .nav-item.active { background: var(--surface-2); color: var(--text); font-weight: 600; }
+  .nav-item .icon { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-item .label { flex: 1; }
+  .nav-item .count {
+    font-size: 11px;
+    color: var(--text-subtle);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 12px 8px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sidebar-footer a { color: inherit; text-decoration: none; }
+  .sidebar-footer a:hover { color: var(--text); }
+
+  /* ============ MAIN ============ */
+  .main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* ============ TOPBAR ============ */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .search {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    transition: border-color 0.12s;
+  }
+  .search:focus-within { border-color: var(--border-strong); }
+  .search input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .search input::placeholder { color: var(--text-subtle); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn:hover { background: var(--hover); }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { opacity: 0.9; background: var(--accent); }
+
+  .icon-btn {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.12s;
+  }
+  .icon-btn:hover { background: var(--hover); color: var(--text); }
+
+  /* ============ FILTER BAR ============ */
+  .filterbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-wrap: wrap;
+  }
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid transparent;
+  }
+  .tab:hover { background: var(--hover); color: var(--text); }
+  .tab.active {
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 600;
+  }
+  .dropdown {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .dropdown:hover { background: var(--hover); color: var(--text); }
+  .dropdown .chev { opacity: 0.5; }
+
+  .filterbar-spacer { flex: 1; }
+
+  .grid-size-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .grid-size-label {
+    font-size: 12px;
+    color: var(--text-subtle);
+    font-weight: 500;
+  }
+  .grid-size {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .grid-size button {
+    width: 34px; height: 32px;
+    display: grid; place-items: center;
+    background: var(--surface);
+    border: none;
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.12s;
+  }
+  .grid-size button:last-child { border-right: none; }
+  .grid-size button:hover { background: var(--hover); color: var(--text); }
+  .grid-size button.active { background: var(--surface-2); color: var(--text); }
+
+  /* ============ GRID ============ */
+  .feed {
+    padding: 24px 28px 40px;
+  }
+  .grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .grid[data-cols="2"] { grid-template-columns: repeat(2, 1fr); }
+  .grid[data-cols="3"] { grid-template-columns: repeat(3, 1fr); }
+  .grid[data-cols="4"] { grid-template-columns: repeat(4, 1fr); }
+  .grid[data-cols="5"] { grid-template-columns: repeat(5, 1fr); }
+
+  /* ============ CARD ============ */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .card:hover {
+    border-color: var(--border-strong);
+  }
+  .card-media {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+  .card-media svg, .card-media .media-inner {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .play-indicator {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+  }
+  .play-indicator div {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    display: grid;
+    place-items: center;
+    color: white;
+  }
+
+  .card-body {
+    padding: 14px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .avatar {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--surface-2);
+  }
+  .username {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .platform-info {
+    text-align: right;
+    font-size: 12px;
+    line-height: 1.3;
+    flex-shrink: 0;
+  }
+  .platform-name { color: var(--text); font-weight: 500; }
+  .platform-time { color: var(--text-subtle); }
+
+  .field { display: flex; flex-direction: column; gap: 3px; }
+  .field-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--label);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .field-value { font-size: 13px; color: var(--text); font-weight: 500; }
+  .prompt-text {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+  }
+  .action {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+  .action:hover { background: var(--hover); color: var(--text); }
+  .actions-spacer { flex: 1; }
+
+  /* ============ SMALL LOGOS INSIDE LIST ============ */
+  .brand-square {
+    width: 22px; height: 22px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    display: grid;
+    place-items: center;
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+
+  /* ============ SCROLLBAR ============ */
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+
+  /* ============ RESPONSIVE (minimal — desktop first) ============ */
+  @media (max-width: 1200px) {
+    .grid[data-cols="5"] { grid-template-columns: repeat(4, 1fr); }
+  }
+  @media (max-width: 980px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .grid, .grid[data-cols="4"], .grid[data-cols="5"] { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">P</div>
+      <div class="logo-text">PromptFeed</div>
+    </div>
+
+    <nav class="nav-group">
+      <a class="nav-item active" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+        <span class="label">Discover</span>
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+        <span class="label">Trending</span>
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span class="label">Recent</span>
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.9h7.1l-5.8 4.3 2.2 6.8-5.9-4.2-5.9 4.2 2.2-6.8L2.5 8.9h7.1z"/></svg>
+        <span class="label">Top</span>
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M17 11l2 2 4-4"/></svg>
+        <span class="label">Following</span>
+      </a>
+    </nav>
+
+    <div class="nav-group">
+      <div class="nav-title">Models</div>
+      <a class="nav-item" href="#"><div class="brand-square">G</div><span class="label">GPT Image</span><span class="count">1.2K</span></a>
+      <a class="nav-item" href="#"><div class="brand-square" style="background:#fef3c7;color:#92400e;border-color:#fcd34d">🍌</div><span class="label">Nano Banana Pro</span><span class="count">842</span></a>
+      <a class="nav-item" href="#"><div class="brand-square">M</div><span class="label">Midjourney</span><span class="count">1.1K</span></a>
+      <a class="nav-item" href="#"><div class="brand-square">D</div><span class="label">DALL·E 3</span><span class="count">673</span></a>
+      <a class="nav-item" href="#"><div class="brand-square">K</div><span class="label">Kling</span><span class="count">1.0K</span></a>
+      <a class="nav-item" href="#"><div class="brand-square">S</div><span class="label">Sora</span><span class="count">987</span></a>
+      <a class="nav-item" href="#"><div class="brand-square">V</div><span class="label">Veo</span><span class="count">688</span></a>
+      <a class="nav-item" href="#"><div class="brand-square">S</div><span class="label">Seedance</span><span class="count">543</span></a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-title">Platforms</div>
+      <a class="nav-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2H21l-6.54 7.47L22 22h-6.813l-5.34-6.98L3.6 22H1l7.01-8.01L2 2h6.98l4.83 6.38L18.244 2zm-2.39 18h1.83L7.24 4H5.3l10.554 16z"/></svg>
+        <span class="label">X / Twitter</span><span class="count">2.3K</span>
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="11" r="1"/><circle cx="15.5" cy="11" r="1"/><path d="M8 15c1 1 2.5 1.5 4 1.5s3-.5 4-1.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span class="label">Reddit</span><span class="count">1.6K</span>
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+        <span class="label">Instagram</span><span class="count">1.4K</span>
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/></svg>
+        <span class="label">YouTube</span><span class="count">980</span>
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19.6 6.3c-1.7 0-3.1-1.4-3.1-3.1V3h-3.4v14.3a2.8 2.8 0 11-2-2.7V11a6.1 6.1 0 105.4 6.1V10a6.5 6.5 0 003.8 1.2V7.8a3.3 3.3 0 01-.7-1.5z"/></svg>
+        <span class="label">TikTok</span><span class="count">765</span>
+      </a>
+    </div>
+
+    <div class="sidebar-footer">
+      <div>© 2026 PromptFeed</div>
+      <div style="display:flex;gap:12px;margin-top:2px;">
+        <a href="#">About</a>
+        <a href="#">Privacy</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color: var(--text-subtle)">
+          <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+        <input type="text" placeholder="Search prompts, models, styles, anything..." />
+      </div>
+      <button class="btn btn-primary">Sign in</button>
+      <button class="icon-btn" id="themeToggle" title="Toggle theme">
+        <svg id="sunIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="filterbar">
+      <button class="tab active">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+        For You
+      </button>
+      <button class="tab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 8a5 5 0 0 0-10 0c-2.8 0-5 2.2-5 5s2.2 5 5 5h10a4 4 0 0 0 0-8z"/></svg>
+        Following
+      </button>
+      <button class="dropdown">All Models <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="dropdown">All Platforms <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="dropdown">All Types <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="dropdown">Newest First <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+
+      <div class="filterbar-spacer"></div>
+
+      <div class="grid-size-wrap">
+        <span class="grid-size-label">Grid size</span>
+        <div class="grid-size" id="gridSize">
+          <button data-cols="2" title="2 columns">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="8" height="16" rx="1"/><rect x="13" y="4" width="8" height="16" rx="1"/></svg>
+          </button>
+          <button data-cols="3" title="3 columns">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="6" height="16" rx="1"/><rect x="9" y="4" width="6" height="16" rx="1"/><rect x="16" y="4" width="6" height="16" rx="1"/></svg>
+          </button>
+          <button data-cols="4" class="active" title="4 columns">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="4" height="16" rx="1"/><rect x="7" y="4" width="4" height="16" rx="1"/><rect x="13" y="4" width="4" height="16" rx="1"/><rect x="18" y="4" width="4" height="16" rx="1"/></svg>
+          </button>
+          <button data-cols="5" title="5 columns">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="3" height="16" rx="1"/><rect x="6" y="4" width="3" height="16" rx="1"/><rect x="10.5" y="4" width="3" height="16" rx="1"/><rect x="15" y="4" width="3" height="16" rx="1"/><rect x="19" y="4" width="3" height="16" rx="1"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEED -->
+    <section class="feed">
+      <div class="grid" id="grid" data-cols="4">
+        <!-- Cards will be injected by JS -->
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  // ============ CARD DATA ============
+  const cards = [
+    {
+      user: "@artbyemma",
+      platform: "X / Twitter",
+      time: "2h ago",
+      model: "GPT Image",
+      prompt: "A breathtaking fantasy landscape of a floating island city above the clouds, waterfalls pouring off the cliffs, ancient architecture with domes and spires, lush greenery, bright midday lighting, ultra detailed, cinematic, 8k",
+      likes: "324", comments: "21", shares: "67",
+      video: false,
+      gradient: ["#60a5fa", "#f472b6", "#34d399"],
+      scene: "landscape"
+    },
+    {
+      user: "@synthexpanse",
+      platform: "Reddit",
+      time: "3h ago",
+      model: "Kling 1.6",
+      prompt: "Cinematic cyberpunk city street at night, heavy rain, neon lights reflecting on wet pavement, flying cars in the background, lone figure with hood, ultra realistic, 4k, moody atmosphere, Unreal Engine 5",
+      likes: "512", comments: "39", shares: "128",
+      video: true,
+      gradient: ["#0f172a", "#7c3aed", "#ec4899"],
+      scene: "cyberpunk"
+    },
+    {
+      user: "@bananastudio",
+      platform: "Instagram",
+      time: "5h ago",
+      model: "Nano Banana Pro",
+      prompt: "A cute 3D banana character wearing a hoodie and headphones, working on a laptop in a cozy room, warm lighting, Pixar style, highly detailed, octane render, shallow depth of field",
+      likes: "1.1K", comments: "48", shares: "215",
+      video: false,
+      gradient: ["#fbbf24", "#f97316", "#7c2d12"],
+      scene: "character"
+    },
+    {
+      user: "@visualvoyager",
+      platform: "YouTube",
+      time: "6h ago",
+      model: "Sora",
+      prompt: "Epic cinematic travel video of a person standing on a mountain cliff at sunrise, clouds moving through the valley, time-lapse feel, ultra realistic, shot on RED camera, 8k, dramatic lighting",
+      likes: "2.3K", comments: "93", shares: "412",
+      video: true,
+      gradient: ["#7dd3fc", "#fbbf24", "#fb923c"],
+      scene: "mountain"
+    },
+    {
+      user: "@mj_collective",
+      platform: "Reddit",
+      time: "7h ago",
+      model: "Midjourney v6",
+      prompt: "Astronaut exploring an alien planet with pink skies, rings of a gas giant in the distance, surreal landscape, ultra detailed, cinematic composition, vibrant colors",
+      likes: "1.7K", comments: "56", shares: "231",
+      video: false,
+      gradient: ["#fb7185", "#be185d", "#581c87"],
+      scene: "space"
+    },
+    {
+      user: "@dailyclips",
+      platform: "X / Twitter",
+      time: "8h ago",
+      model: "Veo 2",
+      prompt: "Golden retriever running on the beach in slow motion, waves splashing, happy dog, natural lighting, ultra realistic, 4k, high frame rate",
+      likes: "842", comments: "26", shares: "132",
+      video: true,
+      gradient: ["#fde68a", "#f59e0b", "#0ea5e9"],
+      scene: "beach"
+    },
+    {
+      user: "@alchemyart",
+      platform: "Instagram",
+      time: "9h ago",
+      model: "DALL·E 3",
+      prompt: "Cozy fantasy cottage in an enchanted forest, warm lights, smoke from chimney, stream nearby, highly detailed, storybook style, magical atmosphere",
+      likes: "1.3K", comments: "34", shares: "178",
+      video: true,
+      gradient: ["#14532d", "#f59e0b", "#1e1b4b"],
+      scene: "cottage"
+    },
+    {
+      user: "@motionlab",
+      platform: "TikTok",
+      time: "10h ago",
+      model: "Seedance 1.0",
+      prompt: "Futuristic dance performance in a neon light studio, fluid motion, glowing trails, cyberpunk style, ultra smooth, 4k, high detail, dynamic camera movement",
+      likes: "654", comments: "19", shares: "98",
+      video: true,
+      gradient: ["#8b5cf6", "#ec4899", "#06b6d4"],
+      scene: "neon"
+    }
+  ];
+
+  // ============ ICONS ============
+  const ICON = {
+    heart: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+    comment: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    share: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+    more: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
+    play: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'
+  };
+
+  // ============ PLACEHOLDER SCENE SVG ============
+  // Abstract but evocative SVG compositions per scene
+  function sceneSVG(scene, gradient, idx) {
+    const [c1, c2, c3] = gradient;
+    const id = `g${idx}`;
+    const common = `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="55%" stop-color="${c2}"/><stop offset="100%" stop-color="${c3}"/></linearGradient></defs>`;
+    const bg = `<rect width="400" height="250" fill="url(#${id})"/>`;
+
+    switch (scene) {
+      case "landscape": // floating island
+        return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">${common}${bg}
+          <circle cx="320" cy="60" r="28" fill="#fff" opacity="0.35"/>
+          <ellipse cx="120" cy="95" rx="70" ry="14" fill="#0f172a" opacity="0.25"/>
+          <polygon points="60,95 180,95 160,135 80,135" fill="#1e293b" opacity="0.75"/>
+          <rect x="95" y="70" width="12" height="30" fill="#334155"/>
+          <polygon points="95,70 101,55 107,70" fill="#475569"/>
+          <rect x="115" y="62" width="10" height="38" fill="#334155"/>
+          <polygon points="115,62 120,45 125,62" fill="#475569"/>
+          <rect x="135" y="75" width="14" height="25" fill="#334155"/>
+          <polygon points="135,75 142,60 149,75" fill="#475569"/>
+          <path d="M90,135 Q85,160 90,200" stroke="#bae6fd" stroke-width="2" fill="none" opacity="0.7"/>
+          <path d="M150,135 Q155,170 152,210" stroke="#bae6fd" stroke-width="2" fill="none" opacity="0.7"/>
+          <ellipse cx="50" cy="50" rx="40" ry="10" fill="#fff" opacity="0.3"/>
+          <ellipse cx="260" cy="40" rx="50" ry="12" fill="#fff" opacity="0.35"/>
+          <ellipse cx="180" cy="210" rx="80" ry="14" fill="#fff" opacity="0.2"/>
+        </svg>`;
+
+      case "cyberpunk": // rainy street
+        return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">${common}${bg}
+          <rect x="0" y="0" width="400" height="180" fill="#0f172a" opacity="0.5"/>
+          <rect x="30" y="50" width="40" height="130" fill="#1e1b4b" opacity="0.9"/>
+          <rect x="85" y="30" width="50" height="150" fill="#1e1b4b" opacity="0.9"/>
+          <rect x="270" y="40" width="45" height="140" fill="#1e1b4b" opacity="0.9"/>
+          <rect x="325" y="55" width="40" height="125" fill="#1e1b4b" opacity="0.9"/>
+          <rect x="35" y="60" width="6" height="6" fill="#f472b6"/>
+          <rect x="50" y="75" width="6" height="6" fill="#f472b6"/>
+          <rect x="92" y="40" width="6" height="6" fill="#60a5fa"/>
+          <rect x="110" y="55" width="6" height="6" fill="#60a5fa"/>
+          <rect x="275" y="50" width="6" height="6" fill="#f472b6"/>
+          <rect x="300" y="70" width="6" height="6" fill="#fbbf24"/>
+          <rect x="330" y="65" width="6" height="6" fill="#60a5fa"/>
+          <ellipse cx="195" cy="175" rx="14" ry="5" fill="#0f172a" opacity="0.6"/>
+          <rect x="188" y="140" width="14" height="35" rx="3" fill="#18181b"/>
+          <circle cx="195" cy="135" r="8" fill="#27272a"/>
+          <rect x="0" y="180" width="400" height="70" fill="#111113"/>
+          <ellipse cx="100" cy="210" rx="80" ry="6" fill="#ec4899" opacity="0.3"/>
+          <ellipse cx="280" cy="210" rx="80" ry="6" fill="#60a5fa" opacity="0.3"/>
+        </svg>`;
+
+      case "character": // banana character
+        return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">${common}${bg}
+          <ellipse cx="200" cy="230" rx="180" ry="20" fill="#451a03" opacity="0.4"/>
+          <path d="M200,70 Q165,90 155,160 Q160,190 200,195 Q240,190 245,160 Q235,90 200,70 Z" fill="#fde047" stroke="#713f12" stroke-width="2"/>
+          <ellipse cx="200" cy="100" rx="40" ry="20" fill="#3f3f46" opacity="0.85"/>
+          <rect x="165" y="105" width="70" height="20" rx="3" fill="#3f3f46"/>
+          <circle cx="175" cy="115" r="8" fill="#18181b"/>
+          <circle cx="225" cy="115" r="8" fill="#18181b"/>
+          <ellipse cx="188" cy="140" rx="3" ry="4" fill="#18181b"/>
+          <ellipse cx="212" cy="140" rx="3" ry="4" fill="#18181b"/>
+          <path d="M188,160 Q200,168 212,160" stroke="#18181b" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <rect x="155" y="185" width="90" height="40" rx="4" fill="#1e293b"/>
+          <rect x="162" y="192" width="76" height="28" rx="2" fill="#0ea5e9" opacity="0.6"/>
+        </svg>`;
+
+      case "mountain": // cliff + sunrise
+        return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">${common}${bg}
+          <circle cx="200" cy="100" r="40" fill="#fff" opacity="0.5"/>
+          <circle cx="200" cy="100" r="25" fill="#fff" opacity="0.7"/>
+          <polygon points="0,200 90,110 160,160 230,100 320,170 400,130 400,250 0,250" fill="#0f172a" opacity="0.85"/>
+          <polygon points="0,220 80,150 160,200 250,140 340,200 400,170 400,250 0,250" fill="#1e293b"/>
+          <ellipse cx="220" cy="193" rx="6" ry="4" fill="#18181b" opacity="0.5"/>
+          <rect x="218" y="175" width="4" height="18" fill="#18181b"/>
+          <circle cx="220" cy="172" r="4" fill="#18181b"/>
+          <ellipse cx="80" cy="90" rx="50" ry="8" fill="#fff" opacity="0.4"/>
+          <ellipse cx="320" cy="75" rx="60" ry="10" fill="#fff" opacity="0.4"/>
+        </svg>`;
+
+      case "space": // astronaut + planet
+        return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">${common}${bg}
+          <circle cx="80" cy="60" r="1.5" fill="#fff"/>
+          <circle cx="140" cy="40" r="1" fill="#fff"/>
+          <circle cx="220" cy="55" r="1.5" fill="#fff"/>
+          <circle cx="310" cy="35" r="1" fill="#fff"/>
+          <circle cx="360" cy="70" r="1.5" fill="#fff"/>
+          <circle cx="40" cy="90" r="1" fill="#fff"/>
+          <circle cx="300" cy="90" r="45" fill="#fbbf24" opacity="0.85"/>
+          <ellipse cx="300" cy="90" rx="75" ry="10" fill="none" stroke="#fde68a" stroke-width="2" opacity="0.8"/>
+          <ellipse cx="300" cy="90" rx="65" ry="6" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.6"/>
+          <path d="M0,200 Q100,180 200,190 Q300,200 400,185 L400,250 L0,250 Z" fill="#7f1d1d"/>
+          <path d="M0,220 Q100,210 200,215 Q300,220 400,210 L400,250 L0,250 Z" fill="#450a0a"/>
+          <ellipse cx="150" cy="205" rx="6" ry="4" fill="#18181b" opacity="0.4"/>
+          <rect x="146" y="180" width="8" height="22" rx="2" fill="#e5e7eb"/>
+          <circle cx="150" cy="174" r="7" fill="#f8fafc"/>
+          <circle cx="150" cy="174" r="4" fill="#1e293b"/>
+        </svg>`;
+
+      case "beach": // dog running
+        return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">${common}${bg}
+          <circle cx="330" cy="55" r="35" fill="#fff" opacity="0.65"/>
+          <rect x="0" y="130" width="400" height="120" fill="#0ea5e9" opacity="0.55"/>
+          <path d="M0,150 Q80,140 160,152 Q240,164 320,150 Q380,142 400,150 L400,130 L0,130 Z" fill="#7dd3fc" opacity="0.7"/>
+          <path d="M0,175 Q100,165 200,172 Q300,179 400,170 L400,160 L0,160 Z" fill="#bae6fd" opacity="0.6"/>
+          <rect x="0" y="195" width="400" height="55" fill="#fef3c7"/>
+          <ellipse cx="190" cy="210" rx="40" ry="8" fill="#0ea5e9" opacity="0.2"/>
+          <ellipse cx="200" cy="185" rx="26" ry="15" fill="#d97706"/>
+          <rect x="180" y="165" width="20" height="22" rx="10" fill="#d97706"/>
+          <ellipse cx="190" cy="163" rx="3" ry="5" fill="#d97706"/>
+          <ellipse cx="175" cy="164" rx="4" ry="6" fill="#92400e" transform="rotate(-20 175 164)"/>
+          <circle cx="186" cy="170" r="1.5" fill="#18181b"/>
+          <rect x="177" y="195" width="4" height="8" fill="#d97706"/>
+          <rect x="198" y="193" width="4" height="10" fill="#d97706"/>
+          <rect x="215" y="196" width="4" height="7" fill="#d97706"/>
+          <circle cx="160" cy="200" r="3" fill="#fff" opacity="0.8"/>
+          <circle cx="168" cy="205" r="2" fill="#fff" opacity="0.8"/>
+          <circle cx="175" cy="210" r="2.5" fill="#fff" opacity="0.8"/>
+        </svg>`;
+
+      case "cottage": // fantasy cottage
+        return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">${common}${bg}
+          <rect x="0" y="0" width="400" height="250" fill="#14532d"/>
+          <rect x="0" y="180" width="400" height="70" fill="#052e16"/>
+          <ellipse cx="60" cy="180" rx="20" ry="60" fill="#064e3b"/>
+          <ellipse cx="330" cy="180" rx="22" ry="65" fill="#064e3b"/>
+          <ellipse cx="380" cy="190" rx="18" ry="55" fill="#064e3b"/>
+          <ellipse cx="15" cy="195" rx="18" ry="55" fill="#064e3b"/>
+          <rect x="155" y="130" width="90" height="70" fill="#78350f"/>
+          <polygon points="150,130 250,130 200,85" fill="#451a03"/>
+          <rect x="185" y="150" width="25" height="45" fill="#1c1917" rx="12"/>
+          <rect x="168" y="150" width="12" height="12" fill="#fcd34d"/>
+          <rect x="220" y="150" width="12" height="12" fill="#fcd34d"/>
+          <rect x="168" y="170" width="12" height="12" fill="#fcd34d"/>
+          <rect x="220" y="170" width="12" height="12" fill="#fcd34d"/>
+          <rect x="220" y="95" width="10" height="30" fill="#292524"/>
+          <ellipse cx="225" cy="80" rx="14" ry="6" fill="#d6d3d1" opacity="0.6"/>
+          <ellipse cx="230" cy="65" rx="18" ry="8" fill="#d6d3d1" opacity="0.45"/>
+          <path d="M100,200 Q150,205 200,200 Q250,198 300,202" stroke="#0ea5e9" stroke-width="3" fill="none" opacity="0.7"/>
+        </svg>`;
+
+      case "neon": // dance performance
+        return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">${common}${bg}
+          <rect x="0" y="0" width="400" height="250" fill="#0a0a0a"/>
+          <path d="M80,230 Q120,120 180,70 Q240,30 330,50" stroke="#ec4899" stroke-width="3" fill="none" opacity="0.9"/>
+          <path d="M100,230 Q140,140 200,90 Q260,50 340,70" stroke="#ec4899" stroke-width="1.5" fill="none" opacity="0.6"/>
+          <path d="M60,220 Q100,150 170,100 Q240,60 330,90" stroke="#06b6d4" stroke-width="2.5" fill="none" opacity="0.8"/>
+          <path d="M40,200 Q90,170 160,130 Q230,90 310,110" stroke="#8b5cf6" stroke-width="2" fill="none" opacity="0.7"/>
+          <ellipse cx="200" cy="215" rx="14" ry="5" fill="#ec4899" opacity="0.5"/>
+          <rect x="195" y="150" width="10" height="65" fill="#f1f5f9"/>
+          <circle cx="200" cy="140" r="10" fill="#f1f5f9"/>
+          <rect x="178" y="155" width="20" height="4" fill="#f1f5f9" transform="rotate(-30 188 157)"/>
+          <rect x="202" y="155" width="20" height="4" fill="#f1f5f9" transform="rotate(30 212 157)"/>
+          <rect x="192" y="210" width="5" height="20" fill="#f1f5f9" transform="rotate(-15 194 220)"/>
+          <rect x="203" y="210" width="5" height="20" fill="#f1f5f9" transform="rotate(15 205 220)"/>
+          <circle cx="60" cy="60" r="3" fill="#ec4899" opacity="0.8"/>
+          <circle cx="340" cy="50" r="3" fill="#06b6d4" opacity="0.8"/>
+          <circle cx="80" cy="180" r="2" fill="#8b5cf6" opacity="0.8"/>
+        </svg>`;
+
+      default:
+        return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">${common}${bg}</svg>`;
+    }
+  }
+
+  // ============ AVATAR PLACEHOLDER ============
+  function avatarSVG(seed, idx) {
+    const colors = [
+      ["#fbbf24","#f97316"], ["#60a5fa","#8b5cf6"], ["#34d399","#0ea5e9"],
+      ["#f472b6","#ec4899"], ["#a78bfa","#6366f1"], ["#fb7185","#f59e0b"],
+      ["#14b8a6","#84cc16"], ["#06b6d4","#8b5cf6"]
+    ];
+    const [c1, c2] = colors[idx % colors.length];
+    const id = `av${idx}`;
+    return `<svg viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs>
+      <rect width="26" height="26" fill="url(#${id})" rx="13"/>
+    </svg>`;
+  }
+
+  // ============ RENDER ============
+  function renderCards() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = cards.map((c, i) => `
+      <article class="card">
+        <div class="card-media">
+          <div class="media-inner">${sceneSVG(c.scene, c.gradient, i)}</div>
+          ${c.video ? `<div class="play-indicator"><div>${ICON.play}</div></div>` : ''}
+        </div>
+        <div class="card-body">
+          <div class="meta-row">
+            <div class="user">
+              <div class="avatar">${avatarSVG(c.user, i)}</div>
+              <span class="username">${c.user}</span>
+            </div>
+            <div class="platform-info">
+              <div class="platform-name">${c.platform}</div>
+              <div class="platform-time">${c.time}</div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label">Model</div>
+            <div class="field-value">${c.model}</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Prompt</div>
+            <div class="prompt-text">${c.prompt}</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="action">${ICON.heart}<span>${c.likes}</span></button>
+          <button class="action">${ICON.comment}<span>${c.comments}</span></button>
+          <button class="action">${ICON.share}<span>${c.shares}</span></button>
+          <div class="actions-spacer"></div>
+          <button class="action">${ICON.more}</button>
+        </div>
+      </article>
+    `).join('');
+  }
+  renderCards();
+
+  // ============ GRID SIZE ============
+  const gridSize = document.getElementById('gridSize');
+  const grid = document.getElementById('grid');
+  gridSize.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const cols = btn.dataset.cols;
+    if (!cols) return;
+    [...gridSize.querySelectorAll('button')].forEach(b => b.classList.toggle('active', b === btn));
+    grid.dataset.cols = cols;
+    localStorage.setItem('pf_cols', cols);
+  });
+  const savedCols = localStorage.getItem('pf_cols');
+  if (savedCols) {
+    grid.dataset.cols = savedCols;
+    [...gridSize.querySelectorAll('button')].forEach(b => b.classList.toggle('active', b.dataset.cols === savedCols));
+  }
+
+  // ============ THEME TOGGLE ============
+  const themeToggle = document.getElementById('themeToggle');
+  const sunIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>';
+  const moonIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    themeToggle.innerHTML = theme === 'dark' ? sunIcon : moonIcon;
+    localStorage.setItem('pf_theme', theme);
+  }
+  const savedTheme = localStorage.getItem('pf_theme') || 'light';
+  applyTheme(savedTheme);
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.dataset.theme;
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  });
+</script>
+
+</body>
+</html>

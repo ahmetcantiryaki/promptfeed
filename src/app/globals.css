@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f5;
+    --border: #e4e4e7;
+    --border-strong: #d4d4d8;
+    --text: #18181b;
+    --text-muted: #71717a;
+    --text-subtle: #a1a1aa;
+    --label: #a1a1aa;
+    --accent: #18181b;
+    --accent-fg: #ffffff;
+    --hover: #f4f4f5;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  [data-theme="dark"] {
+    --bg: rgb(12 10 9);
+    --bg-overlay: rgb(12 10 9 / 0.2);
+    --surface: rgb(20 18 16);
+    --surface-2: rgb(28 25 23);
+    --border: rgb(41 37 36);
+    --border-strong: rgb(68 64 60);
+    --text: #fafaf9;
+    --text-muted: #a8a29e;
+    --text-subtle: #78716c;
+    --label: #78716c;
+    --accent: #fafaf9;
+    --accent-fg: rgb(12 10 9);
+    --hover: rgb(28 25 23);
+    --shadow: 0 1px 2px rgb(12 10 9 / 0.4);
+  }
+
+  html,
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family:
+      var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace,
+      SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 13.5px;
+    line-height: 1.55;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "ss02", "cv11", "calt", "liga";
+  }
+
+  * {
+    border-color: var(--border);
+  }
+}
+
+@layer utilities {
+  .line-clamp-4 {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ---------- Modal (Radix Dialog) transitions ---------- */
+@keyframes pf-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pf-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes pf-content-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes pf-content-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+}
+
+.pf-modal-overlay[data-state="open"] {
+  animation: pf-fade-in 180ms ease-out;
+}
+.pf-modal-overlay[data-state="closed"] {
+  animation: pf-fade-out 160ms ease-in;
+}
+.pf-modal-content[data-state="open"] {
+  animation: pf-content-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pf-modal-content[data-state="closed"] {
+  animation: pf-content-out 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---------- Card hover bar slide-in ---------- */
+.pf-card-bar {
+  transform: translateY(10%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 200ms ease-out;
+}
+.group:hover .pf-card-bar,
+.group:focus-within .pf-card-bar {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Actions zone inside the bar — only hot when bar is fully revealed */
+.pf-card-actions {
+  pointer-events: none;
+}
+.group:hover .pf-card-actions,
+.group:focus-within .pf-card-actions {
+  pointer-events: auto;
+}
+
+/* Avatar editor tool chip — force the imported part SVG to fill the chip. */
+.pf-chip-child {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.pf-chip-child > svg {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Playful jelly bounce on chip hover — matches react-nice-avatar demo */
+@keyframes pf-jelly {
+  0%, 100% { transform: scale(1, 1); }
+  25% { transform: scale(0.92, 1.08); }
+  50% { transform: scale(1.08, 0.92); }
+  75% { transform: scale(0.96, 1.04); }
+}
+.pf-chip-jelly:hover {
+  animation: pf-jelly 0.5s;
+}
