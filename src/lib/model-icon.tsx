@@ -87,6 +87,13 @@ export const MODEL_BRAND: Record<string, ModelBrand> = {
     path: MIDJOURNEY_PATH,
     letter: "M",
   },
+  "midjourney-v8-1": {
+    label: "Midjourney v8.1",
+    bg: "#000000",
+    fg: "#ffffff",
+    path: MIDJOURNEY_PATH,
+    letter: "M",
+  },
   // Kling — Kuaishou (no simple-icon, monogram)
   kling: {
     label: "Kling",

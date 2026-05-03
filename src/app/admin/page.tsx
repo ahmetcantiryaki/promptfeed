@@ -7,6 +7,7 @@ import {
   listAllPosts,
   listAllProfilesWithEmail,
   listReports,
+  listTaxonomyForAdmin,
 } from "@/lib/admin";
 import { AdminClient } from "./admin-client";
 
@@ -22,13 +23,15 @@ export default async function AdminPage() {
   const admin = await isAdmin(user.id);
   if (!admin) notFound();
 
-  const [profile, profiles, reports, stats, posts] = await Promise.all([
-    getProfile(user.id),
-    listAllProfilesWithEmail(),
-    listReports(),
-    getPlatformStats(),
-    listAllPosts(),
-  ]);
+  const [profile, profiles, reports, stats, posts, taxonomy] =
+    await Promise.all([
+      getProfile(user.id),
+      listAllProfilesWithEmail(),
+      listReports(),
+      getPlatformStats(),
+      listAllPosts(),
+      listTaxonomyForAdmin(),
+    ]);
 
   return (
     <AdminClient
@@ -37,6 +40,7 @@ export default async function AdminPage() {
       reports={reports}
       stats={stats}
       posts={posts}
+      taxonomy={taxonomy}
     />
   );
 }

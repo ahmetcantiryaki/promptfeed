@@ -330,7 +330,7 @@ function EditorFooter({ owner }: { owner: OwnerInfo | null }) {
   const xUrl = owner.xUrl;
   const inner = (
     <>
-      <span className="text-text-subtle">Curator</span>
+      <span className="text-text-subtle">Creator</span>
       <span className="font-semibold text-text">{handle}</span>
       {xUrl ? (
         <ExternalLink

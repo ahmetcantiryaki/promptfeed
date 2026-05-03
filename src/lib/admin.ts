@@ -1,10 +1,68 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database";
-import type { Post } from "@/types/domain";
+import type { Model, Platform, Post } from "@/types/domain";
 
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 export type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
+
+export interface TaxonomyRow {
+  slug: string;
+  name: string;
+  icon_url: string | null;
+  created_at: string;
+  post_count: number;
+}
+
+export interface TaxonomyData {
+  models: TaxonomyRow[];
+  platforms: TaxonomyRow[];
+}
+
+export async function listTaxonomyForAdmin(): Promise<TaxonomyData> {
+  const supabase = await createClient();
+  const [modelsRes, platformsRes, postsRes] = await Promise.all([
+    supabase
+      .from("models")
+      .select("slug, name, icon_url, created_at")
+      .order("name"),
+    supabase
+      .from("platforms")
+      .select("slug, name, icon_url, created_at")
+      .order("name"),
+    supabase.from("posts").select("model_slug, platform_slug"),
+  ]);
+  if (modelsRes.error) throw modelsRes.error;
+  if (platformsRes.error) throw platformsRes.error;
+  if (postsRes.error) throw postsRes.error;
+
+  const modelCounts = new Map<string, number>();
+  const platformCounts = new Map<string, number>();
+  for (const row of postsRes.data ?? []) {
+    modelCounts.set(row.model_slug, (modelCounts.get(row.model_slug) ?? 0) + 1);
+    platformCounts.set(
+      row.platform_slug,
+      (platformCounts.get(row.platform_slug) ?? 0) + 1,
+    );
+  }
+
+  const decorate = (
+    rows: Pick<Model | Platform, "slug" | "name" | "icon_url" | "created_at">[],
+    counts: Map<string, number>,
+  ): TaxonomyRow[] =>
+    rows.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      icon_url: r.icon_url,
+      created_at: r.created_at,
+      post_count: counts.get(r.slug) ?? 0,
+    }));
+
+  return {
+    models: decorate(modelsRes.data ?? [], modelCounts),
+    platforms: decorate(platformsRes.data ?? [], platformCounts),
+  };
+}
 
 export interface ProfileWithEmail extends ProfileRow {
   email: string | null;

@@ -18,14 +18,17 @@ import {
   Pencil,
   Trash2,
   Wand2,
+  Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LogoMark } from "@/components/ui/logo-mark";
+import { TaxonomyPanel } from "@/components/features/admin/taxonomy-panel";
 import type {
   ProfileRow,
   ProfileWithEmail,
   ReportRow,
   PlatformStats,
+  TaxonomyData,
 } from "@/lib/admin";
 import type { Post, Profile } from "@/types/domain";
 import { createClient } from "@/lib/supabase/browser";
@@ -41,9 +44,10 @@ interface Props {
   reports: ReportRow[];
   stats: PlatformStats;
   posts: Post[];
+  taxonomy: TaxonomyData;
 }
 
-type SectionKey = "stats" | "prompts" | "users" | "reports";
+type SectionKey = "stats" | "prompts" | "users" | "reports" | "taxonomy";
 
 interface SectionEntry {
   key: SectionKey;
@@ -77,6 +81,12 @@ const SECTIONS: SectionEntry[] = [
     description: "Review and act on flagged content.",
     Icon: Flag,
   },
+  {
+    key: "taxonomy",
+    label: "Taxonomy",
+    description: "Manage AI models and source platforms.",
+    Icon: Tag,
+  },
 ];
 
 export function AdminClient({
@@ -85,6 +95,7 @@ export function AdminClient({
   reports,
   stats,
   posts,
+  taxonomy,
 }: Props) {
   const [section, setSection] = useState<SectionKey>("stats");
   const current = SECTIONS.find((s) => s.key === section) ?? SECTIONS[0]!;
@@ -134,6 +145,7 @@ export function AdminClient({
           {section === "prompts" ? <PromptsPanel posts={posts} /> : null}
           {section === "users" ? <UsersPanel profiles={profiles} /> : null}
           {section === "reports" ? <ReportsPanel reports={reports} /> : null}
+          {section === "taxonomy" ? <TaxonomyPanel taxonomy={taxonomy} /> : null}
         </div>
       </main>
     </div>
