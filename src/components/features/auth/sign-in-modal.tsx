@@ -310,7 +310,7 @@ function ForgotView({ onSignIn }: { onSignIn: () => void }) {
     try {
       const redirectTo =
         typeof window !== "undefined"
-          ? `${window.location.origin}/login`
+          ? `${window.location.origin}/auth/callback?next=/reset-password`
           : "";
       const result = await requestPasswordReset(email, redirectTo);
       if (result.success) {

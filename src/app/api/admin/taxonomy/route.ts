@@ -22,6 +22,13 @@ interface DeleteBody {
   slug: string;
 }
 
+interface PatchBody {
+  kind: Kind;
+  slug: string;
+  name?: string;
+  iconUrl?: string | null;
+}
+
 function isHttpsUrl(v: string): boolean {
   if (v.length > MAX_ICON_URL_LEN) return false;
   try {
@@ -64,6 +71,40 @@ function parseDelete(raw: unknown): DeleteBody | null {
   if (r.kind !== "model" && r.kind !== "platform") return null;
   if (typeof r.slug !== "string" || !SLUG_RE.test(r.slug)) return null;
   return { kind: r.kind, slug: r.slug };
+}
+
+function parsePatch(raw: unknown): PatchBody | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (r.kind !== "model" && r.kind !== "platform") return null;
+  if (typeof r.slug !== "string" || !SLUG_RE.test(r.slug)) return null;
+
+  const out: PatchBody = { kind: r.kind, slug: r.slug };
+
+  if ("name" in r) {
+    if (typeof r.name !== "string") return null;
+    const name = r.name.trim();
+    if (!name || name.length > MAX_NAME_LEN) return null;
+    out.name = name;
+  }
+
+  if ("iconUrl" in r) {
+    if (r.iconUrl === null) {
+      out.iconUrl = null;
+    } else {
+      if (typeof r.iconUrl !== "string") return null;
+      const v = r.iconUrl.trim();
+      if (v.length === 0) {
+        out.iconUrl = null;
+      } else {
+        if (!(isHttpsUrl(v) || isPathUrl(v))) return null;
+        out.iconUrl = v;
+      }
+    }
+  }
+
+  if (out.name === undefined && out.iconUrl === undefined) return null;
+  return out;
 }
 
 export async function POST(request: Request) {
@@ -199,4 +240,74 @@ export async function DELETE(request: Request) {
   }
 
   return NextResponse.json({ success: true, error: null });
+}
+
+export async function PATCH(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { success: false, error: "unauthenticated" },
+      { status: 401 },
+    );
+  }
+  if (!(await isAdmin(user.id))) {
+    return NextResponse.json(
+      { success: false, error: "forbidden" },
+      { status: 403 },
+    );
+  }
+  const limited = await rateLimit({
+    bucket: "api:admin:taxonomy",
+    limit: 30,
+    windowSec: 60,
+    identifier: user.id,
+  });
+  if (!limited.ok) return tooManyRequests(limited);
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "invalid_json" },
+      { status: 400 },
+    );
+  }
+  const body = parsePatch(raw);
+  if (!body) {
+    return NextResponse.json(
+      { success: false, error: "invalid_input" },
+      { status: 400 },
+    );
+  }
+
+  const supabase = await createClient();
+  const table = body.kind === "model" ? "models" : "platforms";
+
+  const update: { name?: string; icon_url?: string | null } = {};
+  if (body.name !== undefined) update.name = body.name;
+  if (body.iconUrl !== undefined) update.icon_url = body.iconUrl;
+
+  const { data, error } = await supabase
+    .from(table)
+    .update(update)
+    .eq("slug", body.slug)
+    .select("slug, name, icon_url, created_at")
+    .single();
+
+  if (error) {
+    return NextResponse.json(
+      { success: false, error: "db_error" },
+      { status: 400 },
+    );
+  }
+
+  if (!data) {
+    return NextResponse.json(
+      { success: false, error: "not_found" },
+      { status: 404 },
+    );
+  }
+
+  return NextResponse.json({ success: true, data, error: null });
 }

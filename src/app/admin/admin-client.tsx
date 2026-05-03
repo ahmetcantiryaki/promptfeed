@@ -15,6 +15,7 @@ import {
   Loader2,
   ExternalLink,
   Image as ImageIcon,
+  ImagePlus,
   Pencil,
   Trash2,
   Wand2,
@@ -30,7 +31,14 @@ import type {
   PlatformStats,
   TaxonomyData,
 } from "@/lib/admin";
-import type { Post, Profile } from "@/types/domain";
+import type {
+  Model,
+  Platform,
+  Post,
+  Profile,
+  SocialAccount,
+} from "@/types/domain";
+import { AddPromptDialog } from "@/components/features/add-prompt/add-prompt-dialog";
 import { createClient } from "@/lib/supabase/browser";
 import { cn, formatCount, timeAgo } from "@/lib/utils";
 import { deletePostWithToast } from "@/lib/admin-post-actions";
@@ -45,6 +53,10 @@ interface Props {
   stats: PlatformStats;
   posts: Post[];
   taxonomy: TaxonomyData;
+  userId: string;
+  socials: SocialAccount[];
+  models: Model[];
+  platforms: Platform[];
 }
 
 type SectionKey = "stats" | "prompts" | "users" | "reports" | "taxonomy";
@@ -96,6 +108,10 @@ export function AdminClient({
   stats,
   posts,
   taxonomy,
+  userId,
+  socials,
+  models,
+  platforms,
 }: Props) {
   const [section, setSection] = useState<SectionKey>("stats");
   const current = SECTIONS.find((s) => s.key === section) ?? SECTIONS[0]!;
@@ -142,7 +158,16 @@ export function AdminClient({
 
         <div className="flex-1 px-7 pb-10 pt-6">
           {section === "stats" ? <StatsPanel stats={stats} /> : null}
-          {section === "prompts" ? <PromptsPanel posts={posts} /> : null}
+          {section === "prompts" ? (
+            <PromptsPanel
+              posts={posts}
+              userId={userId}
+              profile={profile}
+              socials={socials}
+              models={models}
+              platforms={platforms}
+            />
+          ) : null}
           {section === "users" ? <UsersPanel profiles={profiles} /> : null}
           {section === "reports" ? <ReportsPanel reports={reports} /> : null}
           {section === "taxonomy" ? <TaxonomyPanel taxonomy={taxonomy} /> : null}
@@ -238,11 +263,49 @@ function AdminSidebar({ section, onSectionChange, counts }: SidebarProps) {
 
 /* ----------------- Prompts ----------------- */
 
-function PromptsPanel({ posts }: { posts: Post[] }) {
+function PromptsPanel({
+  posts,
+  userId,
+  profile,
+  socials,
+  models,
+  platforms,
+}: {
+  posts: Post[];
+  userId: string;
+  profile: Profile | null;
+  socials: SocialAccount[];
+  models: Model[];
+  platforms: Platform[];
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Post | null>(null);
   const [deleting, setDeleting] = useState<Post | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const addButton = (
+    <button
+      type="button"
+      onClick={() => setAdding(true)}
+      className="inline-flex items-center gap-1.5 rounded-[10px] border border-accent bg-accent px-3.5 py-2 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90"
+    >
+      <ImagePlus className="h-3.5 w-3.5" strokeWidth={2} />
+      Add prompt
+    </button>
+  );
+
+  const addDialog = (
+    <AddPromptDialog
+      open={adding}
+      onOpenChange={setAdding}
+      userId={userId}
+      profile={profile}
+      socials={socials}
+      models={models}
+      platforms={platforms}
+    />
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -259,35 +322,42 @@ function PromptsPanel({ posts }: { posts: Post[] }) {
 
   if (posts.length === 0) {
     return (
-      <div className="grid place-items-center rounded-[12px] border bg-surface-2/40 py-20 text-center">
-        <div className="flex max-w-[360px] flex-col items-center gap-2 px-6">
-          <ImageIcon className="h-6 w-6 text-text-subtle" strokeWidth={1.6} />
-          <div className="text-[15px] font-semibold text-text">
-            Henüz prompt yok
+      <>
+        <div className="grid place-items-center rounded-[12px] border bg-surface-2/40 py-20 text-center">
+          <div className="flex max-w-[360px] flex-col items-center gap-3 px-6">
+            <ImageIcon className="h-6 w-6 text-text-subtle" strokeWidth={1.6} />
+            <div className="text-[15px] font-semibold text-text">
+              Henüz prompt yok
+            </div>
+            <p className="text-[13px] text-text-muted">
+              İlk promptu ekleyerek başla.
+            </p>
+            <div className="mt-1">{addButton}</div>
           </div>
-          <p className="text-[13px] text-text-muted">
-            Yeni bir prompt eklediğinde burada listelenecek.
-          </p>
         </div>
-      </div>
+        {addDialog}
+      </>
     );
   }
 
   return (
     <>
       <div className="flex flex-col gap-3">
-        <label className="flex w-full items-center gap-2 rounded-[10px] border bg-surface-2 px-3 py-2 sm:w-[420px]">
-          <Search
-            className="h-3.5 w-3.5 shrink-0 text-text-subtle"
-            strokeWidth={2}
-          />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Prompt, kullanıcı, model, platform ara…"
-            className="min-w-0 flex-1 bg-transparent text-[13px] text-text placeholder:text-text-subtle focus:outline-none"
-          />
-        </label>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="flex w-full items-center gap-2 rounded-[10px] border bg-surface-2 px-3 py-2 sm:w-[420px]">
+            <Search
+              className="h-3.5 w-3.5 shrink-0 text-text-subtle"
+              strokeWidth={2}
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Prompt, kullanıcı, model, platform ara…"
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-text placeholder:text-text-subtle focus:outline-none"
+            />
+          </label>
+          {addButton}
+        </div>
 
         <div className="overflow-x-auto rounded-[12px] border bg-surface">
           <table className="w-full min-w-[820px] text-left text-[13px]">
@@ -391,6 +461,8 @@ function PromptsPanel({ posts }: { posts: Post[] }) {
           </table>
         </div>
       </div>
+
+      {addDialog}
 
       {editing ? (
         <EditPostDialog

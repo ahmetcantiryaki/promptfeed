@@ -1,9 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Plus, Trash2, X, Loader2, Check, Image as ImageIcon } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  X,
+  Loader2,
+  Check,
+  Image as ImageIcon,
+  Pencil,
+} from "lucide-react";
 import { toast } from "sonner";
 import { ModelBadge, MODEL_BRAND } from "@/lib/model-icon";
 import { PlatformBadge, PLATFORM_THEME, isPlatformSlug } from "@/lib/platform-icon";
@@ -61,9 +69,28 @@ async function deleteTaxonomy(body: unknown): Promise<ApiResult<never>> {
   }
 }
 
+async function patchTaxonomy(body: unknown): Promise<ApiResult<CreatedRow>> {
+  const res = await fetch("/api/admin/taxonomy", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 429) {
+    return { success: false, error: "Too fast — try again in a moment." };
+  }
+  try {
+    return (await res.json()) as ApiResult<CreatedRow>;
+  } catch {
+    return { success: false, error: "request_failed" };
+  }
+}
+
 export function TaxonomyPanel({ taxonomy }: { taxonomy: TaxonomyData }) {
   const router = useRouter();
   const [adding, setAdding] = useState<Kind | null>(null);
+  const [editing, setEditing] = useState<{ kind: Kind; row: TaxonomyRow } | null>(
+    null,
+  );
   const [deleting, setDeleting] = useState<{ kind: Kind; row: TaxonomyRow } | null>(
     null,
   );
@@ -76,6 +103,7 @@ export function TaxonomyPanel({ taxonomy }: { taxonomy: TaxonomyData }) {
         rows={taxonomy.models}
         kind="model"
         onAdd={() => setAdding("model")}
+        onEdit={(row) => setEditing({ kind: "model", row })}
         onDelete={(row) => setDeleting({ kind: "model", row })}
       />
       <Section
@@ -84,12 +112,18 @@ export function TaxonomyPanel({ taxonomy }: { taxonomy: TaxonomyData }) {
         rows={taxonomy.platforms}
         kind="platform"
         onAdd={() => setAdding("platform")}
+        onEdit={(row) => setEditing({ kind: "platform", row })}
         onDelete={(row) => setDeleting({ kind: "platform", row })}
       />
 
       <AddDialog
         kind={adding}
         onClose={() => setAdding(null)}
+      />
+
+      <EditDialog
+        editing={editing}
+        onClose={() => setEditing(null)}
       />
 
       <ConfirmDialog
@@ -134,10 +168,19 @@ interface SectionProps {
   rows: TaxonomyRow[];
   kind: Kind;
   onAdd: () => void;
+  onEdit: (row: TaxonomyRow) => void;
   onDelete: (row: TaxonomyRow) => void;
 }
 
-function Section({ title, description, rows, kind, onAdd, onDelete }: SectionProps) {
+function Section({
+  title,
+  description,
+  rows,
+  kind,
+  onAdd,
+  onEdit,
+  onDelete,
+}: SectionProps) {
   return (
     <section>
       <header className="mb-3 flex items-center justify-between">
@@ -164,7 +207,13 @@ function Section({ title, description, rows, kind, onAdd, onDelete }: SectionPro
           </div>
         ) : (
           rows.map((row) => (
-            <Row key={row.slug} kind={kind} row={row} onDelete={onDelete} />
+            <Row
+              key={row.slug}
+              kind={kind}
+              row={row}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
           ))
         )}
       </div>
@@ -175,10 +224,12 @@ function Section({ title, description, rows, kind, onAdd, onDelete }: SectionPro
 function Row({
   kind,
   row,
+  onEdit,
   onDelete,
 }: {
   kind: Kind;
   row: TaxonomyRow;
+  onEdit: (row: TaxonomyRow) => void;
   onDelete: (row: TaxonomyRow) => void;
 }) {
   return (
@@ -192,6 +243,14 @@ function Row({
           {row.slug} · {row.post_count} posts
         </div>
       </div>
+      <button
+        type="button"
+        aria-label={`Edit ${row.name}`}
+        onClick={() => onEdit(row)}
+        className="grid h-8 w-8 place-items-center rounded-[8px] text-text-subtle transition-colors hover:bg-hover hover:text-text"
+      >
+        <Pencil className="h-4 w-4" strokeWidth={1.8} />
+      </button>
       <button
         type="button"
         aria-label={`Delete ${row.name}`}
@@ -463,6 +522,164 @@ interface PresetOption {
   slug: string;
   label: string;
   kind: Kind;
+}
+
+/* ---------- Edit dialog ---------- */
+
+function EditDialog({
+  editing,
+  onClose,
+}: {
+  editing: { kind: Kind; row: TaxonomyRow } | null;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [iconUrl, setIconUrl] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (editing) {
+      setName(editing.row.name);
+      setIconUrl(editing.row.icon_url ?? "");
+      setSubmitting(false);
+    }
+  }, [editing]);
+
+  const open = editing !== null;
+  const onChangeOpen = (next: boolean) => {
+    if (!next) {
+      setSubmitting(false);
+      onClose();
+    }
+  };
+
+  const trimmedName = name.trim();
+  const trimmedIcon = iconUrl.trim();
+  const dirty =
+    editing !== null &&
+    (trimmedName !== editing.row.name ||
+      (trimmedIcon || null) !== (editing.row.icon_url ?? null));
+  const canSubmit = Boolean(trimmedName) && dirty && !submitting;
+
+  async function handleSubmit() {
+    if (!editing) return;
+    setSubmitting(true);
+    const res = await patchTaxonomy({
+      kind: editing.kind,
+      slug: editing.row.slug,
+      name: trimmedName,
+      iconUrl: trimmedIcon ? trimmedIcon : null,
+    });
+    setSubmitting(false);
+    if (!res.success) {
+      toast.error(res.error ?? "Could not save");
+      return;
+    }
+    toast.success(`${trimmedName} updated`);
+    onChangeOpen(false);
+    router.refresh();
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onChangeOpen}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/65 backdrop-blur" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-[70] w-[min(94vw,520px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[14px] border bg-surface shadow-2xl outline-none">
+          <header className="flex items-center justify-between gap-2 border-b px-5 py-4">
+            <Dialog.Title className="text-[15px] font-semibold text-text">
+              Edit {editing?.kind}
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                aria-label="Close"
+                className="grid h-7 w-7 place-items-center rounded-full text-text-subtle transition-colors hover:bg-hover hover:text-text"
+              >
+                <X className="h-4 w-4" strokeWidth={2} />
+              </button>
+            </Dialog.Close>
+          </header>
+
+          <div className="flex flex-col gap-4 px-5 py-5">
+            <Field
+              label="Slug"
+              hint="Stable identifier referenced by posts. Cannot be changed."
+            >
+              <input
+                type="text"
+                value={editing?.row.slug ?? ""}
+                disabled
+                className="w-full cursor-not-allowed rounded-[8px] border bg-surface-2 px-3 py-2 font-mono text-[12px] text-text-subtle outline-none"
+              />
+            </Field>
+
+            <Field label="Display name">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Midjourney v8.1"
+                maxLength={60}
+                className="w-full rounded-[8px] border bg-surface-2 px-3 py-2 text-[13px] text-text outline-none focus:border-text/50"
+              />
+            </Field>
+
+            <Field
+              label="Icon URL"
+              hint="Absolute path under /logos, /icons, /assets, or a full https URL. Leave empty to fall back to the built-in glyph."
+            >
+              <input
+                type="text"
+                value={iconUrl}
+                onChange={(e) => setIconUrl(e.target.value)}
+                placeholder="/logos/midjourney.svg"
+                maxLength={500}
+                className="w-full rounded-[8px] border bg-surface-2 px-3 py-2 font-mono text-[12px] text-text outline-none focus:border-text/50"
+              />
+              <div className="mt-2 flex items-center gap-2 rounded-[8px] border bg-surface-2/40 px-3 py-2">
+                <Preview
+                  kind={editing?.kind ?? "model"}
+                  slug={editing?.row.slug ?? ""}
+                  iconUrl={trimmedIcon || null}
+                />
+                <span className="truncate text-[11px] text-text-subtle">
+                  Preview
+                </span>
+              </div>
+            </Field>
+          </div>
+
+          <footer className="flex items-center justify-end gap-2 border-t bg-surface-2/40 px-5 py-3">
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                className="rounded-[8px] border bg-surface px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+              >
+                Cancel
+              </button>
+            </Dialog.Close>
+            <button
+              type="button"
+              disabled={!canSubmit}
+              onClick={handleSubmit}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-[8px] bg-text px-3 py-1.5 text-[12px] font-semibold text-bg transition-opacity",
+                canSubmit ? "hover:opacity-90" : "cursor-not-allowed opacity-50",
+              )}
+            >
+              {submitting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+              ) : (
+                <Check className="h-3.5 w-3.5" strokeWidth={2} />
+              )}
+              Save changes
+            </button>
+          </footer>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
 }
 
 function Field({

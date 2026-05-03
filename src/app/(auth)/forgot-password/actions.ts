@@ -27,10 +27,14 @@ export async function requestPasswordReset(
     return { success: false, error: "invalid_email" };
   }
 
+  // Per-email rate limit: 10 reset requests / hour. The bucket is keyed by
+  // the lowercased email so a user retrying from multiple devices/IPs is
+  // throttled together, while different users on the same NAT are not.
   const limited = await rateLimit({
     bucket: "auth:forgot",
-    limit: 5,
+    limit: 10,
     windowSec: 60 * 60,
+    identifier: trimmed,
   });
   if (!limited.ok) {
     return { success: false, error: "rate_limited" };

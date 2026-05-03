@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { getProfile } from "@/lib/profiles";
+import { getProfile, getSocialAccounts } from "@/lib/profiles";
+import { listModelsAndPlatforms } from "@/lib/posts";
 import {
   getPlatformStats,
   isAdmin,
@@ -23,7 +24,7 @@ export default async function AdminPage() {
   const admin = await isAdmin(user.id);
   if (!admin) notFound();
 
-  const [profile, profiles, reports, stats, posts, taxonomy] =
+  const [profile, profiles, reports, stats, posts, taxonomy, socials, mp] =
     await Promise.all([
       getProfile(user.id),
       listAllProfilesWithEmail(),
@@ -31,6 +32,8 @@ export default async function AdminPage() {
       getPlatformStats(),
       listAllPosts(),
       listTaxonomyForAdmin(),
+      getSocialAccounts(user.id),
+      listModelsAndPlatforms(),
     ]);
 
   return (
@@ -41,6 +44,10 @@ export default async function AdminPage() {
       stats={stats}
       posts={posts}
       taxonomy={taxonomy}
+      userId={user.id}
+      socials={socials}
+      models={mp.models}
+      platforms={mp.platforms}
     />
   );
 }
