@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import * as Dialog from "@radix-ui/react-dialog";
 import { Loader2, X, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/browser";
@@ -18,49 +18,46 @@ interface Props {
 }
 
 export function SignInModal({ open, onClose, onSignedIn }: Props) {
-  const [mounted, setMounted] = useState(false);
   const [view, setView] = useState<View>("signin");
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (open) setView("signin");
   }, [open]);
 
-  if (!mounted || !open) return null;
-
-  const node = (
-    <div
-      className="fixed inset-0 z-[200] grid place-items-center bg-black/65 p-4 backdrop-blur-sm"
-      onClick={onClose}
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-[min(92vw,420px)] overflow-hidden rounded-[14px] border bg-surface shadow-2xl"
-      >
-        <Header view={view} onBack={() => setView("signin")} onClose={onClose} />
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[200] bg-black/65 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          className="fixed left-1/2 top-1/2 z-[210] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[14px] border bg-surface shadow-2xl outline-none"
+        >
+          <Dialog.Title className="sr-only">Sign in to PromptFeed</Dialog.Title>
+          <Header view={view} onBack={() => setView("signin")} onClose={onClose} />
 
-        {view === "signin" ? (
-          <SignInView
-            onSignedIn={onSignedIn}
-            onForgot={() => setView("forgot")}
-            onRegister={() => setView("register")}
-          />
-        ) : view === "register" ? (
-          <RegisterView
-            onSignedIn={onSignedIn}
-            onSignIn={() => setView("signin")}
-          />
-        ) : (
-          <ForgotView onSignIn={() => setView("signin")} />
-        )}
-      </div>
-    </div>
+          {view === "signin" ? (
+            <SignInView
+              onSignedIn={onSignedIn}
+              onForgot={() => setView("forgot")}
+              onRegister={() => setView("register")}
+            />
+          ) : view === "register" ? (
+            <RegisterView
+              onSignedIn={onSignedIn}
+              onSignIn={() => setView("signin")}
+            />
+          ) : (
+            <ForgotView onSignIn={() => setView("signin")} />
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
-
-  return createPortal(node, document.body);
 }
 
 function Header({
