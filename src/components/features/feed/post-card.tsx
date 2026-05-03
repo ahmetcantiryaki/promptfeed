@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Heart, Bookmark, Wand2, Images } from "lucide-react";
+import {
+  Heart,
+  Bookmark,
+  Wand2,
+  Images,
+  ExternalLink,
+} from "lucide-react";
 import type { Post } from "@/types/domain";
 import type { OwnerInfo } from "@/lib/posts";
 import { cn, formatCount } from "@/lib/utils";
@@ -11,6 +17,14 @@ import { useInteractions } from "@/components/providers/interactions-provider";
 import { PostCardMenu } from "./post-card-menu";
 import { RemixCurtain } from "./remix-curtain";
 import { PostContextMenuWrapper } from "./post-context-menu";
+import { safeHref } from "@/lib/safe-url";
+
+function externalSourceUrl(post: Post): string | null {
+  const candidate = post.external_creator_url ?? post.source_url ?? null;
+  if (!candidate) return null;
+  if (candidate.startsWith("promptfeed://")) return null;
+  return safeHref(candidate);
+}
 
 interface Props {
   post: Post;
@@ -28,7 +42,10 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
 
   const isRemix =
     post.prompt_type === "remix" && Boolean(post.source_image_url);
-  const extraImages = post.extra_image_urls ?? [];
+  const extraImages = useMemo(
+    () => post.extra_image_urls ?? [],
+    [post.extra_image_urls],
+  );
   const hasExtras = !isRemix && extraImages.length > 0;
 
   const allImages = useMemo(() => {
@@ -133,6 +150,7 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
             >
               {formatCount(saveCount)}
             </ActionBtn>
+            <SourceBtn url={externalSourceUrl(post)} />
             <PostCardMenu post={post} tone="dark" />
           </div>
         </div>
@@ -212,6 +230,22 @@ interface ActionBtnProps {
   active: boolean;
   activeClass: string;
   onClick: () => void;
+}
+
+function SourceBtn({ url }: { url: string | null }) {
+  if (!url) return null;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open source in new tab"
+      onClick={(e) => e.stopPropagation()}
+      className="inline-flex h-8 items-center gap-1 rounded-full bg-black/55 px-2 text-white backdrop-blur-md transition-all hover:bg-black/75 active:scale-95"
+    >
+      <ExternalLink className="h-4 w-4" strokeWidth={2} />
+    </a>
+  );
 }
 
 function ActionBtn({

@@ -3,14 +3,15 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import * as Tabs from "@radix-ui/react-tabs";
 import {
+  ArrowLeft,
   Users,
   Flag,
   BarChart3,
   BadgeCheck,
   Ban,
   Search,
+  Shield,
   Loader2,
   ExternalLink,
   Image as ImageIcon,
@@ -19,8 +20,13 @@ import {
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { ProfileRow, ReportRow, PlatformStats } from "@/lib/admin";
-import type { Post } from "@/types/domain";
+import type {
+  ProfileRow,
+  ProfileWithEmail,
+  ReportRow,
+  PlatformStats,
+} from "@/lib/admin";
+import type { Post, Profile } from "@/types/domain";
 import { createClient } from "@/lib/supabase/browser";
 import { cn, formatCount, timeAgo } from "@/lib/utils";
 import { deletePostWithToast } from "@/lib/admin-post-actions";
@@ -29,90 +35,192 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { prettyModel, prettyPlatform } from "@/lib/labels";
 
 interface Props {
-  profiles: ProfileRow[];
+  profile: Profile | null;
+  profiles: ProfileWithEmail[];
   reports: ReportRow[];
   stats: PlatformStats;
   posts: Post[];
 }
 
-type TabKey = "stats" | "prompts" | "users" | "reports";
+type SectionKey = "stats" | "prompts" | "users" | "reports";
 
-const TABS: {
-  key: TabKey;
+interface SectionEntry {
+  key: SectionKey;
   label: string;
-  icon: React.ReactNode;
-}[] = [
+  description: string;
+  Icon: typeof BarChart3;
+}
+
+const SECTIONS: SectionEntry[] = [
   {
     key: "stats",
     label: "Stats",
-    icon: <BarChart3 className="h-3.5 w-3.5" strokeWidth={1.8} />,
+    description: "Platform pulse — users, prompts, engagement, reports.",
+    Icon: BarChart3,
   },
   {
     key: "prompts",
     label: "Prompts",
-    icon: <ImageIcon className="h-3.5 w-3.5" strokeWidth={1.8} />,
+    description: "Browse, edit and remove published prompts.",
+    Icon: ImageIcon,
   },
   {
     key: "users",
     label: "Users",
-    icon: <Users className="h-3.5 w-3.5" strokeWidth={1.8} />,
+    description: "Verify, ban, and manage member accounts.",
+    Icon: Users,
   },
   {
     key: "reports",
     label: "Reports",
-    icon: <Flag className="h-3.5 w-3.5" strokeWidth={1.8} />,
+    description: "Review and act on flagged content.",
+    Icon: Flag,
   },
 ];
 
-export function AdminClient({ profiles, reports, stats, posts }: Props) {
-  const [tab, setTab] = useState<TabKey>("stats");
+export function AdminClient({
+  profile,
+  profiles,
+  reports,
+  stats,
+  posts,
+}: Props) {
+  const [section, setSection] = useState<SectionKey>("stats");
+  const current = SECTIONS.find((s) => s.key === section) ?? SECTIONS[0]!;
 
   return (
-    <Tabs.Root
-      value={tab}
-      onValueChange={(v) => setTab(v as TabKey)}
-      className="flex flex-col gap-5"
-    >
-      <Tabs.List className="flex gap-1 rounded-[12px] border bg-surface-2/40 p-1">
-        {TABS.map((t) => (
-          <Tabs.Trigger
-            key={t.key}
-            value={t.key}
-            className={cn(
-              "flex flex-1 items-center justify-center gap-2 rounded-[8px] px-3 py-2 text-[13px] font-medium text-text-muted outline-none transition-colors",
-              "hover:bg-hover hover:text-text",
-              "data-[state=active]:bg-surface data-[state=active]:text-text data-[state=active]:shadow-surface data-[state=active]:border",
-            )}
-          >
-            {t.icon}
-            <span>{t.label}</span>
-            {t.key === "prompts" ? (
-              <span className="rounded-full border bg-surface px-1.5 py-[1px] text-[10px] font-semibold text-text-muted">
-                {posts.length}
-              </span>
-            ) : null}
-            {t.key === "reports" && stats.openReports > 0 ? (
-              <span className="rounded-full bg-red-500 px-1.5 py-[1px] text-[10px] font-bold text-white">
-                {stats.openReports}
-              </span>
-            ) : null}
-          </Tabs.Trigger>
-        ))}
-      </Tabs.List>
+    <div className="grid min-h-screen grid-cols-[248px_1fr]">
+      <AdminSidebar
+        section={section}
+        onSectionChange={setSection}
+        counts={{
+          prompts: posts.length,
+          users: profiles.length,
+          openReports: stats.openReports,
+        }}
+      />
 
-      <Tabs.Content value="stats" className="outline-none">
-        <StatsPanel stats={stats} />
-      </Tabs.Content>
-      <Tabs.Content value="prompts" className="outline-none">
-        <PromptsPanel posts={posts} />
-      </Tabs.Content>
-      <Tabs.Content value="users" className="outline-none">
-        <UsersPanel profiles={profiles} />
-      </Tabs.Content>
-      <Tabs.Content value="reports" className="outline-none">
-        <ReportsPanel reports={reports} />
-      </Tabs.Content>
-    </Tabs.Root>
+      <main className="flex min-w-0 flex-col">
+        <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center justify-between gap-3 border-b bg-surface px-6">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-7 w-7 place-items-center rounded-[8px] bg-surface-2 text-text-muted">
+              <current.Icon className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+            <div className="flex flex-col leading-tight">
+              <h1 className="text-[15px] font-semibold tracking-tight text-text">
+                {current.label}
+              </h1>
+              <span className="text-[11px] text-text-subtle">
+                {current.description}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {profile?.handle ? (
+              <span className="hidden text-[12px] text-text-subtle sm:inline">
+                @{profile.handle}
+              </span>
+            ) : null}
+            <span className="inline-flex items-center gap-1 rounded-full border border-text/30 bg-surface-2 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-text">
+              <Shield className="h-3 w-3" strokeWidth={2} />
+              Admin
+            </span>
+          </div>
+        </header>
+
+        <div className="flex-1 px-7 pb-10 pt-6">
+          {section === "stats" ? <StatsPanel stats={stats} /> : null}
+          {section === "prompts" ? <PromptsPanel posts={posts} /> : null}
+          {section === "users" ? <UsersPanel profiles={profiles} /> : null}
+          {section === "reports" ? <ReportsPanel reports={reports} /> : null}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+interface SidebarProps {
+  section: SectionKey;
+  onSectionChange: (next: SectionKey) => void;
+  counts: { prompts: number; users: number; openReports: number };
+}
+
+function AdminSidebar({ section, onSectionChange, counts }: SidebarProps) {
+  return (
+    <aside className="sticky top-0 flex h-screen w-[248px] shrink-0 flex-col gap-4 overflow-hidden border-r bg-surface px-3 py-4">
+      <Link href="/" className="flex items-center gap-2.5 px-2 py-0.5">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent text-[16px] font-bold text-accent-fg">
+          P
+        </span>
+        <span className="text-[16px] font-semibold tracking-tight">
+          PromptFeed
+        </span>
+      </Link>
+
+      <div className="flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+        <Shield className="h-3 w-3" strokeWidth={2} />
+        Admin panel
+      </div>
+
+      <nav className="flex flex-col gap-0.5">
+        {SECTIONS.map(({ key, label, Icon }) => {
+          const active = section === key;
+          const count =
+            key === "prompts"
+              ? counts.prompts
+              : key === "users"
+                ? counts.users
+                : key === "reports"
+                  ? counts.openReports
+                  : undefined;
+          const isOpenReports = key === "reports" && counts.openReports > 0;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSectionChange(key)}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex items-center gap-2.5 rounded-[8px] px-2.5 py-[7px] text-[14px] transition-colors",
+                active
+                  ? "bg-surface-2 font-medium text-text"
+                  : "text-text-muted hover:bg-hover hover:text-text",
+              )}
+            >
+              <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
+              <span className="flex-1 text-left">{label}</span>
+              {count !== undefined && count > 0 ? (
+                <span
+                  className={cn(
+                    "tabular-nums text-[11px] font-medium",
+                    isOpenReports
+                      ? "rounded-full bg-red-500 px-1.5 py-[1px] text-white"
+                      : "text-text-subtle",
+                  )}
+                >
+                  {formatCount(count)}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto flex flex-col gap-2 border-t pt-3">
+        <Link
+          href="/"
+          className="flex items-center gap-2 rounded-[8px] px-2.5 py-[7px] text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
+          Back to feed
+        </Link>
+        <footer className="flex items-center gap-3 px-2 text-[11px] text-text-subtle">
+          <a href="#" className="hover:text-text">Help</a>
+          <a href="#" className="hover:text-text">Privacy</a>
+          <a href="#" className="hover:text-text">Terms</a>
+        </footer>
+      </div>
+    </aside>
   );
 }
 
@@ -320,7 +428,6 @@ function StatsPanel({ stats }: { stats: PlatformStats }) {
     },
     { label: "Likes", value: stats.likes, tone: "neutral" as const },
     { label: "Saves", value: stats.saves, tone: "neutral" as const },
-    { label: "Follows", value: stats.follows, tone: "neutral" as const },
     {
       label: "Open reports",
       value: stats.openReports,
@@ -356,7 +463,7 @@ function StatsPanel({ stats }: { stats: PlatformStats }) {
 
 /* ----------------- Users ----------------- */
 
-function UsersPanel({ profiles }: { profiles: ProfileRow[] }) {
+function UsersPanel({ profiles }: { profiles: ProfileWithEmail[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
@@ -368,6 +475,7 @@ function UsersPanel({ profiles }: { profiles: ProfileRow[] }) {
       (p) =>
         p.handle?.toLowerCase().includes(q) ||
         p.display_name?.toLowerCase().includes(q) ||
+        p.email?.toLowerCase().includes(q) ||
         p.id.toLowerCase().includes(q),
     );
   }, [profiles, query]);
@@ -449,7 +557,7 @@ function UsersPanel({ profiles }: { profiles: ProfileRow[] }) {
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1 truncate font-medium text-text">
-                          {p.display_name ?? "—"}
+                          {p.display_name ?? p.email ?? "—"}
                           {p.is_verified ? (
                             <BadgeCheck
                               className="h-3.5 w-3.5 text-text"
@@ -457,8 +565,27 @@ function UsersPanel({ profiles }: { profiles: ProfileRow[] }) {
                             />
                           ) : null}
                         </div>
-                        <div className="text-[11px] text-text-subtle">
-                          {p.handle ? `@${p.handle}` : p.id.slice(0, 8)}
+                        <div className="flex items-center gap-1.5 text-[11px] text-text-subtle">
+                          {p.handle ? (
+                            <span>@{p.handle}</span>
+                          ) : (
+                            <code className="rounded bg-surface-2 px-1 py-[1px] font-mono text-[10px]">
+                              {p.id.slice(0, 8)}
+                            </code>
+                          )}
+                          {p.email ? (
+                            <>
+                              <span>·</span>
+                              <span className="truncate" title={p.email}>
+                                {p.email}
+                              </span>
+                            </>
+                          ) : null}
+                          {p.email && !p.email_confirmed ? (
+                            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-amber-500">
+                              unconfirmed
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>

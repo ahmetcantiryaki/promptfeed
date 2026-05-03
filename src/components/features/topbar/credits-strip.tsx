@@ -6,8 +6,8 @@ interface Creator {
 }
 
 const CREATORS: Creator[] = [
-  { handle: "@ahmetcantryk", url: "https://x.com/ahmetcantryk" },
   { handle: "@eyupyusufa", url: "https://x.com/eyupyusufa" },
+  { handle: "@ahmetcantryk", url: "https://x.com/ahmetcantryk" },
 ];
 
 /**

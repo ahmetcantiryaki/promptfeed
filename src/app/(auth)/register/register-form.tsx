@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/browser";
 import { registerAction } from "./actions";
@@ -13,18 +13,28 @@ export function RegisterForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(
+    null,
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const result = await registerAction(email, password);
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/login`
+          : undefined;
+      const result = await registerAction(email, password, redirectTo);
       if (!result.ok) {
         setError(result.error ?? "Could not create account.");
         return;
       }
-      // Account created & auto-confirmed — sign in immediately.
+      if (result.needsConfirmation) {
+        setConfirmationEmail(email);
+        return;
+      }
       const supabase = createClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -40,6 +50,21 @@ export function RegisterForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (confirmationEmail) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-2 text-center">
+        <CheckCircle2 className="h-10 w-10 text-text" strokeWidth={1.6} />
+        <div className="text-[15px] font-semibold text-text">
+          Check your email
+        </div>
+        <p className="text-[13px] text-text-muted">
+          We&apos;ve sent a confirmation link to <b>{confirmationEmail}</b>.
+          Click it to activate your account.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -59,10 +84,10 @@ export function RegisterForm() {
         onChange={setPassword}
         autoComplete="new-password"
         required
-        minLength={8}
+        minLength={10}
       />
       <p className="-mt-1 text-[11px] text-text-subtle">
-        At least 8 characters.
+        At least 10 characters with letters and numbers.
       </p>
       {error ? (
         <div className="rounded-[8px] border border-red-500/40 bg-red-500/10 px-3 py-2 text-[12px] text-red-500">

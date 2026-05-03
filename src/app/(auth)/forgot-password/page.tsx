@@ -2,7 +2,9 @@ import Link from "next/link";
 import { ForgotPasswordForm } from "./forgot-password-form";
 
 export const metadata = {
-  title: "Forgot password — PromptFeed",
+  title: "Forgot password",
+  robots: { index: false, follow: false },
+  alternates: { canonical: "/forgot-password" },
 };
 
 export default function ForgotPasswordPage() {

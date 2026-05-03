@@ -19,6 +19,7 @@ import { useInteractions } from "@/components/providers/interactions-provider";
 import { deletePostWithToast } from "@/lib/admin-post-actions";
 import { EditPostDialog } from "@/components/features/admin/edit-post-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { safeHref } from "@/lib/safe-url";
 
 interface Props {
   post: Post;
@@ -79,9 +80,10 @@ export function PostContextMenuWrapper({ post, children, onOpenDetail }: Props) 
               Copy prompt
             </Item>
             <Item
-              onSelect={() =>
-                window.open(post.source_url, "_blank", "noopener,noreferrer")
-              }
+              onSelect={() => {
+                const safe = safeHref(post.source_url);
+                if (safe) window.open(safe, "_blank", "noopener,noreferrer");
+              }}
               icon={<ExternalLink className="h-3.5 w-3.5" />}
             >
               Open source

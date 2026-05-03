@@ -1,72 +1,51 @@
-import Link from "next/link";
+"use client";
+
 import { Search } from "lucide-react";
 import type { Model, Platform, PostSort } from "@/types/domain";
 import { FilterDropdown } from "./filter-dropdown";
 import { GridSizeSelector } from "./grid-size-selector";
+import { useFeedFilter } from "@/components/providers/feed-filter-provider";
 
 interface FilterBarProps {
   models: Model[];
   platforms: Platform[];
-  activeModel?: string;
-  activePlatform?: string;
-  activeSort: PostSort;
-  activeTab: "for-you" | "following";
 }
 
-export function FilterBar({
-  models,
-  platforms,
-  activeModel,
-  activePlatform,
-  activeSort,
-  activeTab,
-}: FilterBarProps) {
+export function FilterBar({ models, platforms }: FilterBarProps) {
+  const { state, setFilter } = useFeedFilter();
+
   return (
     <div className="flex flex-wrap items-center gap-2 border-b bg-surface px-7 py-3">
-      {/* LEFT CLUSTER — For You, Following, filters, Search */}
-      <Link
-        href="/"
-        data-active={activeTab === "for-you" ? "true" : undefined}
-        className="inline-flex items-center gap-1.5 rounded-[10px] border border-transparent px-3.5 py-1.5 text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text data-[active=true]:bg-accent data-[active=true]:font-semibold data-[active=true]:text-accent-fg"
-      >
-        For You
-      </Link>
-      <Link
-        href="/?tab=following"
-        data-active={activeTab === "following" ? "true" : undefined}
-        className="inline-flex items-center gap-1.5 rounded-[10px] border border-transparent px-3.5 py-1.5 text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text data-[active=true]:bg-accent data-[active=true]:font-semibold data-[active=true]:text-accent-fg"
-      >
-        Following
-      </Link>
-
       <FilterDropdown
-        paramKey="model"
-        activeValue={activeModel}
+        activeValue={state.model}
         allLabel="All Models"
         options={models.map((m) => ({
           value: m.slug,
           label: m.name,
           meta: m.post_count,
         }))}
+        onChange={(v) => setFilter({ model: v })}
       />
       <FilterDropdown
-        paramKey="platform"
-        activeValue={activePlatform}
+        activeValue={state.platform}
         allLabel="All Platforms"
         options={platforms.map((p) => ({
           value: p.slug,
           label: p.name,
           meta: p.post_count,
         }))}
+        onChange={(v) => setFilter({ platform: v })}
       />
       <FilterDropdown
-        paramKey="sort"
-        activeValue={activeSort === "newest" ? undefined : activeSort}
+        activeValue={state.sort === "newest" ? undefined : state.sort}
         allLabel="Newest First"
         options={[
           { value: "newest", label: "Newest First" },
           { value: "top", label: "Top Liked" },
         ]}
+        onChange={(v) =>
+          setFilter({ sort: (v as PostSort | undefined) ?? "newest" })
+        }
       />
 
       <label className="flex w-[220px] items-center gap-2 rounded-[10px] border bg-surface-2 px-3 py-1.5 transition-all focus-within:w-[300px] focus-within:border-border-strong">
@@ -78,7 +57,6 @@ export function FilterBar({
         />
       </label>
 
-      {/* flex-1 spacer — pushes Grid Size alone to the far right */}
       <div className="flex-1" />
 
       <div className="inline-flex items-center gap-2">

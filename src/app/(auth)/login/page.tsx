@@ -4,7 +4,9 @@ import { LoginForm } from "./login-form";
 import { getCurrentUser } from "@/lib/supabase/auth";
 
 export const metadata = {
-  title: "Sign in — PromptFeed",
+  title: "Sign in",
+  robots: { index: false, follow: false },
+  alternates: { canonical: "/login" },
 };
 
 export default async function LoginPage() {

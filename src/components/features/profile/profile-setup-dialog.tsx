@@ -1,7 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { Sparkles, X } from "lucide-react";
+import { Sparkles, X, Info } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import type { Profile, SocialAccount } from "@/types/domain";
 import { ProfileEditor } from "./profile-editor";
@@ -12,6 +12,7 @@ interface Props {
   user: User;
   profile: Profile | null;
   socials: SocialAccount[];
+  isAdmin?: boolean;
 }
 
 /**
@@ -24,6 +25,7 @@ export function ProfileSetupDialog({
   user,
   profile,
   socials,
+  isAdmin = false,
 }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -62,6 +64,24 @@ export function ProfileSetupDialog({
             </Dialog.Close>
           </div>
 
+          {!isAdmin ? (
+            <div className="flex items-start gap-2.5 border-b bg-amber-500/5 px-6 py-3">
+              <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-amber-500/15 text-amber-600">
+                <Info className="h-3.5 w-3.5" strokeWidth={2} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[12px] font-semibold uppercase tracking-[0.06em] text-amber-700 dark:text-amber-400">
+                  Beta — heads up
+                </div>
+                <p className="mt-0.5 text-[13px] leading-[1.55] text-text-muted">
+                  Avatar &amp; profile customization is in beta. It will become
+                  important once we open up prompt sharing to all users — until
+                  then, you can skip this and finish later from settings.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             <ProfileEditor
               user={user}
@@ -70,6 +90,19 @@ export function ProfileSetupDialog({
               onSaved={() => onOpenChange(false)}
             />
           </div>
+
+          {!isAdmin ? (
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t bg-surface-2/40 px-6 py-3">
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className="rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+                >
+                  Maybe later
+                </button>
+              </Dialog.Close>
+            </div>
+          ) : null}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

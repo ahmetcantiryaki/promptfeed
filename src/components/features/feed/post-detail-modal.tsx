@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   X,
@@ -7,20 +8,21 @@ import {
   Copy,
   ExternalLink,
   Bookmark,
-  UserPlus,
-  UserCheck,
   Wand2,
   Share2,
+  Braces,
 } from "lucide-react";
+import { PLATFORM_THEME } from "@/lib/platform-icon";
 import { toast } from "sonner";
 import type { Post } from "@/types/domain";
 import type { OwnerInfo } from "@/lib/posts";
 import { cn, formatCount, timeAgo } from "@/lib/utils";
-import { modelVisual } from "@/lib/brand";
+import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { prettyModel, prettyPlatform } from "@/lib/labels";
-import { BrandSquare } from "@/components/ui/brand-square";
 import { useInteractions } from "@/components/providers/interactions-provider";
+import { tryParseJson, prettifyJson } from "@/lib/prompt-format";
+import { safeHref } from "@/lib/safe-url";
 import { RemixCurtain } from "./remix-curtain";
 import { DetailImageSlider } from "./detail-image-slider";
 
@@ -31,40 +33,36 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-export function PostDetailModal({
-  post,
-  owner: _owner,
-  open,
-  onOpenChange,
-}: Props) {
-  const {
-    liked,
-    saved,
-    followedHandles,
-    currentHandle,
-    toggleLike,
-    toggleSave,
-    toggleFollow,
-  } = useInteractions();
+export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
+  const { liked, saved, toggleLike, toggleSave } = useInteractions();
   const isLiked = post ? liked.has(post.id) : false;
   const isSaved = post ? saved.has(post.id) : false;
 
-  const sourceUser = post?.source_user ?? null;
-  const isSelf =
-    !!sourceUser && !!currentHandle && sourceUser === `@${currentHandle}`;
-  const canFollow = Boolean(sourceUser) && !isSelf;
-  const isFollowingOwner = Boolean(
-    sourceUser && followedHandles.has(sourceUser),
-  );
-
   const likeCount = (post?.likes ?? 0) + (isLiked ? 1 : 0);
   const saveCount = (post?.shares ?? 0) + (isSaved ? 1 : 0);
+
+  const parsedJson = useMemo(
+    () => (post ? tryParseJson(post.prompt) : null),
+    [post],
+  );
+  const isJson = parsedJson !== null;
 
   async function copyPrompt() {
     if (!post) return;
     try {
       await navigator.clipboard.writeText(post.prompt);
       toast.success("Prompt copied");
+    } catch {
+      toast.error("Copy failed");
+    }
+  }
+
+  async function copyPromptAsJson() {
+    if (!post) return;
+    const pretty = prettifyJson(post.prompt) ?? post.prompt;
+    try {
+      await navigator.clipboard.writeText(pretty);
+      toast.success("JSON copied");
     } catch {
       toast.error("Copy failed");
     }
@@ -95,7 +93,17 @@ export function PostDetailModal({
 
           {post ? (
             <>
-              {/* LEFT — 70% — image area, centered, object-contain */}
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  className="absolute right-3 top-3 z-40 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur-md transition-colors hover:bg-black/75"
+                >
+                  <X className="h-4 w-4" strokeWidth={2} />
+                </button>
+              </Dialog.Close>
+
+              {/* LEFT — image area */}
               <div className="relative flex items-center justify-center overflow-hidden bg-black">
                 {post.prompt_type === "remix" && post.source_image_url ? (
                   <RemixCurtain
@@ -124,73 +132,17 @@ export function PostDetailModal({
                     Remix
                   </div>
                 ) : null}
-
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    aria-label="Close"
-                    className="absolute right-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur-md transition-colors hover:bg-black/75"
-                  >
-                    <X className="h-4 w-4" strokeWidth={2} />
-                  </button>
-                </Dialog.Close>
               </div>
 
-              {/* RIGHT — 30% — details panel (only the prompt text scrolls) */}
+              {/* RIGHT — details panel */}
               <aside className="flex min-w-0 flex-col overflow-hidden border-l bg-surface">
-                <div className="flex shrink-0 items-start justify-between gap-2 border-b px-5 py-4">
-                  <div className="min-w-0">
-                    <div className="truncate text-[14px] font-semibold text-text">
-                      {post.source_user}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-text-subtle">
-                      {isPlatformSlug(post.platform_slug) ? (
-                        <PlatformBadge
-                          platform={post.platform_slug}
-                          size={12}
-                          rounded={3}
-                        />
-                      ) : null}
-                      <span>{prettyPlatform(post.platform_slug)}</span>
-                      <span>·</span>
-                      <span>{timeAgo(post.posted_at)}</span>
-                    </div>
-                  </div>
-                  {canFollow && sourceUser ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleFollow(sourceUser)}
-                      aria-pressed={isFollowingOwner}
-                      className={cn(
-                        "inline-flex h-8 shrink-0 items-center gap-1 rounded-full border px-3 text-[12px] font-semibold transition-all active:scale-95",
-                        isFollowingOwner
-                          ? "border-transparent bg-surface-2 text-text hover:bg-hover"
-                          : "border-accent bg-accent text-accent-fg hover:opacity-90",
-                      )}
-                    >
-                      {isFollowingOwner ? (
-                        <>
-                          <UserCheck className="h-3 w-3" strokeWidth={2} />
-                          Following
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="h-3 w-3" strokeWidth={2} />
-                          Follow
-                        </>
-                      )}
-                    </button>
-                  ) : null}
-                </div>
+                <DetailHeader post={post} />
 
                 <div className="flex min-h-0 flex-1 flex-col gap-5 px-5 py-5">
                   <div className="shrink-0">
                     <Field label="Model">
                       <div className="flex items-center gap-2">
-                        <BrandSquare
-                          visual={modelVisual(post.model_slug)}
-                          size={22}
-                        />
+                        <ModelBadge slug={post.model_slug} size={22} />
                         <span className="text-[14px] font-semibold text-text">
                           {prettyModel(post.model_slug)}
                         </span>
@@ -199,22 +151,38 @@ export function PostDetailModal({
                   </div>
 
                   <div className="flex min-h-0 flex-1 flex-col gap-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
-                      Prompt
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+                        Prompt
+                      </div>
+                      {isJson ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
+                          <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
+                          JSON
+                        </span>
+                      ) : null}
                     </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto rounded-[10px] border bg-surface-2 p-3">
-                      <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-text">
-                        {post.prompt}
-                      </p>
+                    <PromptBody post={post} parsedJson={parsedJson} />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={copyPrompt}
+                        className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+                      >
+                        <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
+                        Copy prompt
+                      </button>
+                      {isJson ? (
+                        <button
+                          type="button"
+                          onClick={copyPromptAsJson}
+                          className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+                        >
+                          <Braces className="h-3.5 w-3.5" strokeWidth={1.8} />
+                          Copy as JSON
+                        </button>
+                      ) : null}
                     </div>
-                    <button
-                      type="button"
-                      onClick={copyPrompt}
-                      className="inline-flex w-fit items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
-                    >
-                      <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
-                      Copy prompt
-                    </button>
                   </div>
 
                   <div className="flex shrink-0 flex-wrap items-center gap-2 border-y py-3">
@@ -254,58 +222,128 @@ export function PostDetailModal({
                     </button>
                   </div>
 
-                  {post.external_creator_handle &&
-                  post.external_creator_platform ? (
-                    <div className="shrink-0">
-                    <Field label="Original creator">
-                      <a
-                        href={post.external_creator_url ?? "#"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group inline-flex w-fit items-center gap-2 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[13px] font-medium text-text transition-colors hover:bg-hover"
-                      >
-                        {isPlatformSlug(post.external_creator_platform) ? (
-                          <PlatformBadge
-                            platform={post.external_creator_platform}
-                            size={14}
-                            rounded={4}
-                          />
-                        ) : null}
-                        <span>{post.external_creator_handle}</span>
-                        <ExternalLink
-                          className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100"
-                          strokeWidth={2}
-                        />
-                      </a>
-                    </Field>
-                    </div>
-                  ) : null}
-
-                  {post.source_url ? (
-                    <div className="shrink-0">
-                      <Field label="Source">
-                        <a
-                          href={post.source_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 break-all text-[12px] text-text-muted hover:text-text"
-                        >
-                          <ExternalLink
-                            className="h-3.5 w-3.5 shrink-0"
-                            strokeWidth={1.8}
-                          />
-                          {post.source_url}
-                        </a>
-                      </Field>
-                    </div>
-                  ) : null}
                 </div>
+
+                <EditorFooter owner={owner} />
               </aside>
             </>
           ) : null}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+function DetailHeader({ post }: { post: Post }) {
+  const sourceUrl = safeHref(
+    post.external_creator_url ??
+      (post.source_url && !post.source_url.startsWith("promptfeed://")
+        ? post.source_url
+        : null),
+  );
+  const platform = post.external_creator_platform ?? post.platform_slug;
+  const handle = post.external_creator_handle;
+  const label =
+    handle ??
+    (isPlatformSlug(platform)
+      ? PLATFORM_THEME[platform].label
+      : prettyPlatform(post.platform_slug));
+
+  const inner = (
+    <>
+      {isPlatformSlug(platform) ? (
+        <PlatformBadge platform={platform} size={18} rounded={5} />
+      ) : null}
+      <span className="min-w-0 truncate text-[14px] font-semibold text-text">
+        {label}
+      </span>
+      {sourceUrl ? (
+        <ExternalLink
+          className="h-3.5 w-3.5 shrink-0 text-text-subtle transition-colors group-hover:text-text"
+          strokeWidth={2}
+        />
+      ) : null}
+    </>
+  );
+
+  return (
+    <div className="flex shrink-0 items-start justify-between gap-2 border-b px-5 py-4">
+      <div className="min-w-0">
+        {sourceUrl ? (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group inline-flex max-w-full items-center gap-2 rounded-[8px] border bg-surface-2 px-3 py-1.5 transition-colors hover:bg-hover"
+          >
+            {inner}
+          </a>
+        ) : (
+          <div className="inline-flex max-w-full items-center gap-2 rounded-[8px] border bg-surface-2 px-3 py-1.5">
+            {inner}
+          </div>
+        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-text-subtle">
+          <span>on {prettyPlatform(post.platform_slug)}</span>
+          <span>·</span>
+          <span>{timeAgo(post.posted_at)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PromptBody({ post, parsedJson }: { post: Post; parsedJson: unknown | null }) {
+  if (parsedJson !== null) {
+    const pretty = JSON.stringify(parsedJson, null, 2);
+    return (
+      <pre className="min-h-0 flex-1 overflow-auto rounded-[10px] border bg-surface-2 p-3 font-mono text-[12px] leading-[1.55] text-text">
+        {pretty}
+      </pre>
+    );
+  }
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto rounded-[10px] border bg-surface-2 p-3">
+      <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-text">
+        {post.prompt}
+      </p>
+    </div>
+  );
+}
+
+function EditorFooter({ owner }: { owner: OwnerInfo | null }) {
+  if (!owner) return null;
+  const handle = owner.handle ?? owner.displayName ?? "editor";
+  const xUrl = owner.xUrl;
+  const inner = (
+    <>
+      <span className="text-text-subtle">Editor</span>
+      <span className="font-semibold text-text">{handle}</span>
+      {xUrl ? (
+        <ExternalLink
+          className="h-3 w-3 text-text-subtle transition-colors group-hover:text-text"
+          strokeWidth={2}
+        />
+      ) : null}
+    </>
+  );
+  return (
+    <div className="flex shrink-0 items-center border-t bg-surface-2/40 px-5 py-3">
+      {xUrl ? (
+        <a
+          href={xUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group inline-flex items-center gap-1.5 rounded-[8px] border bg-surface px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-hover"
+        >
+          {inner}
+        </a>
+      ) : (
+        <span className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface px-2.5 py-1.5 text-[12px] font-medium">
+          {inner}
+        </span>
+      )}
+    </div>
   );
 }
 

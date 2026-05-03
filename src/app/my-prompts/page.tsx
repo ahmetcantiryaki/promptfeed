@@ -6,25 +6,29 @@ import { getProfile } from "@/lib/profiles";
 import { listMyPosts, getMyPostStats } from "@/lib/my-prompts";
 import { MyPromptsClient } from "./my-prompts-client";
 
-export const metadata = { title: "My prompts — PromptFeed" };
+export const metadata = {
+  title: "My prompts",
+  robots: { index: false, follow: false },
+  alternates: { canonical: "/my-prompts" },
+};
 
 export default async function MyPromptsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const profile = await getProfile(user.id);
+  if (profile?.is_banned) {
+    const { BannedScreen } = await import(
+      "@/components/features/banned/banned-screen"
+    );
+    return <BannedScreen />;
+  }
   const posts = await listMyPosts(user.id);
-  const sourceUser = profile?.handle ? `@${profile.handle}` : null;
 
-  const stats = await Promise.all(
-    posts.map(async (p) =>
-      sourceUser ? getMyPostStats(p.id, sourceUser) : { likes: 0, saves: 0, followers: 0 },
-    ),
-  );
+  const stats = await Promise.all(posts.map((p) => getMyPostStats(p.id)));
 
   const totalLikes = stats.reduce((a, s) => a + s.likes, 0);
   const totalSaves = stats.reduce((a, s) => a + s.saves, 0);
-  const followers = stats[0]?.followers ?? 0;
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[1040px] flex-col gap-6 px-6 py-10">
@@ -54,11 +58,10 @@ export default async function MyPromptsPage() {
       </header>
 
       {/* Totals */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard label="Prompts" value={posts.length} />
         <StatCard label="Total likes" value={totalLikes} />
         <StatCard label="Total saves" value={totalSaves} />
-        <StatCard label="Followers" value={followers} />
       </div>
 
       <MyPromptsClient posts={posts} stats={stats} />

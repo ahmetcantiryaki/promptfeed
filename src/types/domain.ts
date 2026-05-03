@@ -15,6 +15,12 @@ export type Platform = Database["public"]["Tables"]["platforms"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type SocialAccount =
   Database["public"]["Tables"]["social_accounts"]["Row"];
+export type SaveFolder = Database["public"]["Tables"]["save_folders"]["Row"];
+
+export interface SaveFolderSummary extends SaveFolder {
+  post_count: number;
+  cover_urls: string[];
+}
 
 export type PostSort = "newest" | "top";
 

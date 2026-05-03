@@ -88,6 +88,30 @@
   to { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
 }
 
+/* Indeterminate top progress bar */
+@keyframes pf-progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.pf-progress-track {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  z-index: 100;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pf-progress-track::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, transparent, var(--accent), transparent);
+  width: 25%;
+  animation: pf-progress-slide 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+
 .pf-modal-overlay[data-state="open"] {
   animation: pf-fade-in 180ms ease-out;
 }

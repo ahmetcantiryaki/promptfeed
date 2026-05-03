@@ -4,7 +4,9 @@ import { RegisterForm } from "./register-form";
 import { getCurrentUser } from "@/lib/supabase/auth";
 
 export const metadata = {
-  title: "Create account — PromptFeed",
+  title: "Create account",
+  robots: { index: false, follow: false },
+  alternates: { canonical: "/register" },
 };
 
 export default async function RegisterPage() {

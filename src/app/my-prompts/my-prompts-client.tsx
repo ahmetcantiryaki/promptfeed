@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Heart, Bookmark, Users, Trash2, Loader2, X } from "lucide-react";
+import { Heart, Bookmark, Trash2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Post } from "@/types/domain";
 import type { MyPostStats } from "@/lib/my-prompts";
@@ -57,7 +57,7 @@ export function MyPromptsClient({ posts, stats }: Props) {
     <>
       <ul className="flex flex-col gap-3">
         {posts.map((post, i) => {
-          const s = stats[i] ?? { likes: 0, saves: 0, followers: 0 };
+          const s = stats[i] ?? { likes: 0, saves: 0 };
           return (
             <li
               key={post.id}
@@ -88,9 +88,6 @@ export function MyPromptsClient({ posts, stats }: Props) {
                   </Stat>
                   <Stat icon={<Bookmark className="h-3.5 w-3.5" strokeWidth={1.8} />}>
                     {s.saves} saves
-                  </Stat>
-                  <Stat icon={<Users className="h-3.5 w-3.5" strokeWidth={1.8} />}>
-                    {s.followers} followers
                   </Stat>
                 </div>
               </div>

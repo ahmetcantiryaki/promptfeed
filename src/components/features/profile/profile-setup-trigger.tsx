@@ -10,6 +10,7 @@ interface Props {
   profile: Profile | null;
   socials: SocialAccount[];
   needsSetup: boolean;
+  isAdmin?: boolean;
 }
 
 const DISMISS_KEY = "promptfeed.profileSetupDismissedAt";
@@ -19,6 +20,7 @@ export function ProfileSetupTrigger({
   profile,
   socials,
   needsSetup,
+  isAdmin = false,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -50,6 +52,7 @@ export function ProfileSetupTrigger({
       user={user}
       profile={profile}
       socials={socials}
+      isAdmin={isAdmin}
     />
   );
 }

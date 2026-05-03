@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import * as Tabs from "@radix-ui/react-tabs";
 import {
   X,
   Loader2,
@@ -13,26 +12,23 @@ import {
   Trash2,
   Link as LinkIcon,
   Wand2,
-  User as UserIcon,
-  AtSign,
+  Braces,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
   Model,
   Platform,
-  PlatformSlug,
   Profile,
   SocialAccount,
 } from "@/types/domain";
 import { createClient } from "@/lib/supabase/browser";
-import { modelVisual } from "@/lib/brand";
-import {
-  PlatformBadge,
-  PLATFORM_THEME,
-  isPlatformSlug,
-} from "@/lib/platform-icon";
-import { BrandSquare } from "@/components/ui/brand-square";
+import { ModelBadge } from "@/lib/model-icon";
+import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
+import { parseSourceUrl, sourceDisplayLabel } from "@/lib/source-url";
 import { PrettySelect, type SelectOption } from "@/components/ui/select";
+import { tryParseJson, prettifyJson } from "@/lib/prompt-format";
+import { processImage } from "@/lib/image-processing";
+import { safeImageSrc } from "@/lib/safe-url";
 import { cn, formatCount } from "@/lib/utils";
 
 interface Props {
@@ -45,8 +41,13 @@ interface Props {
   platforms: Platform[];
 }
 
-const MAX_SIZE_MB = 8;
-const PROMPT_MAX = 4000;
+const MAX_SIZE_MB = 5;
+const PROMPT_MAX = 32000;
+const UPLOAD_CACHE_CONTROL = "31536000";
+
+function isLikelyImageUrl(raw: string): boolean {
+  return safeImageSrc(raw) !== null;
+}
 
 function hostnameFromUrl(raw: string): string | null {
   const v = raw.trim();
@@ -61,12 +62,6 @@ function hostnameFromUrl(raw: string): string | null {
 }
 
 type PromptType = "standard" | "remix";
-type AttributionMode = "self" | "reference";
-
-function extOf(name: string): string {
-  const dot = name.lastIndexOf(".");
-  return dot >= 0 ? name.slice(dot + 1).toLowerCase() : "png";
-}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -78,22 +73,36 @@ interface FileSlot {
   file: File | null;
   url: string | null;
   dims: { w: number; h: number } | null;
+  externalUrl: string;
 }
 
-const EMPTY_SLOT: FileSlot = { file: null, url: null, dims: null };
+const EMPTY_SLOT: FileSlot = {
+  file: null,
+  url: null,
+  dims: null,
+  externalUrl: "",
+};
+
+function slotIsFilled(s: FileSlot): boolean {
+  return Boolean(s.file) || isLikelyImageUrl(s.externalUrl);
+}
+
+function slotPreviewUrl(s: FileSlot): string | null {
+  if (s.file && s.url) return s.url;
+  if (isLikelyImageUrl(s.externalUrl)) return s.externalUrl.trim();
+  return null;
+}
 
 export function AddPromptDialog({
   open,
   onOpenChange,
   userId,
-  profile,
-  socials,
+  profile: _profile,
+  socials: _socials,
   models,
   platforms,
 }: Props) {
   const router = useRouter();
-
-  const [attribution, setAttribution] = useState<AttributionMode>("self");
   const [promptType, setPromptType] = useState<PromptType>("standard");
 
   const [result, setResult] = useState<FileSlot>(EMPTY_SLOT);
@@ -108,13 +117,11 @@ export function AddPromptDialog({
   const [modelSlug, setModelSlug] = useState(models[0]?.slug ?? "");
   const [platformSlug, setPlatformSlug] = useState(platforms[0]?.slug ?? "");
 
-  // External creator (reference mode)
-  const [extHandle, setExtHandle] = useState("");
-  const [extPlatform, setExtPlatform] = useState<PlatformSlug>("x");
-  const [extUrl, setExtUrl] = useState("");
-
-  // Self reference (optional source URL)
-  const [selfSourceUrl, setSelfSourceUrl] = useState("");
+  const [creatorUrl, setCreatorUrl] = useState("");
+  const parsedCreator = useMemo(
+    () => parseSourceUrl(creatorUrl),
+    [creatorUrl],
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,12 +138,8 @@ export function AddPromptDialog({
     };
   }, [result.url, source.url]);
 
-  // Pre-fill "self" source URL from socials on open
-  useEffect(() => {
-    if (!open) return;
-    const xLink = socials.find((s) => s.platform === "x")?.url;
-    if (xLink && !selfSourceUrl) setSelfSourceUrl(xLink);
-  }, [open, socials, selfSourceUrl]);
+  const parsedJson = useMemo(() => tryParseJson(prompt), [prompt]);
+  const isJson = parsedJson !== null;
 
   function pickFile(slot: "result" | "source", selected: File | null) {
     if (!selected) return;
@@ -150,7 +153,12 @@ export function AddPromptDialog({
     }
     setError(null);
     const url = URL.createObjectURL(selected);
-    const update: FileSlot = { file: selected, url, dims: null };
+    const update: FileSlot = {
+      file: selected,
+      url,
+      dims: null,
+      externalUrl: "",
+    };
     const img = new Image();
     img.onload = () => {
       const dims = { w: img.naturalWidth, h: img.naturalHeight };
@@ -168,6 +176,19 @@ export function AddPromptDialog({
     } else {
       if (source.url) URL.revokeObjectURL(source.url);
       setSource(update);
+    }
+  }
+
+  function setSlotExternalUrl(slot: "result" | "source", value: string) {
+    setError(null);
+    if (slot === "result") {
+      if (result.url) URL.revokeObjectURL(result.url);
+      if (resultInputRef.current) resultInputRef.current.value = "";
+      setResult({ file: null, url: null, dims: null, externalUrl: value });
+    } else {
+      if (source.url) URL.revokeObjectURL(source.url);
+      if (sourceInputRef.current) sourceInputRef.current.value = "";
+      setSource({ file: null, url: null, dims: null, externalUrl: value });
     }
   }
 
@@ -207,7 +228,7 @@ export function AddPromptDialog({
     setExtras((prev) => {
       const next = [...prev];
       if (next[index]?.url) URL.revokeObjectURL(next[index]!.url!);
-      next[index] = { file, url, dims: null };
+      next[index] = { file, url, dims: null, externalUrl: "" };
       return next;
     });
   }
@@ -220,11 +241,7 @@ export function AddPromptDialog({
     });
     setExtras([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
     setPrompt("");
-    setExtHandle("");
-    setExtUrl("");
-    setExtPlatform("x");
-    setSelfSourceUrl("");
-    setAttribution("self");
+    setCreatorUrl("");
     setPromptType("standard");
     setError(null);
   }
@@ -234,28 +251,64 @@ export function AddPromptDialog({
     onOpenChange(next);
   }
 
-  async function uploadImage(file: File, postId: string, tag: string): Promise<string> {
+  interface UploadedImage {
+    mainUrl: string;
+    thumbUrl: string;
+  }
+
+  async function uploadImage(
+    file: File,
+    postId: string,
+    tag: string,
+  ): Promise<UploadedImage> {
     const supabase = createClient();
-    const ext = extOf(file.name) || "png";
-    const path = `${userId}/${postId}-${tag}.${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from("user-uploads")
-      .upload(path, file, {
-        contentType: file.type || "image/png",
+    const processed = await processImage(file);
+    const mainPath = `${userId}/${postId}-${tag}.webp`;
+    const thumbPath = `${userId}/${postId}-${tag}-thumb.webp`;
+
+    const [mainResult, thumbResult] = await Promise.all([
+      supabase.storage.from("user-uploads").upload(mainPath, processed.full, {
+        contentType: "image/webp",
         upsert: false,
-      });
-    if (upErr) throw upErr;
-    const { data } = supabase.storage.from("user-uploads").getPublicUrl(path);
-    return data.publicUrl;
+        cacheControl: UPLOAD_CACHE_CONTROL,
+      }),
+      supabase.storage.from("user-uploads").upload(thumbPath, processed.thumb, {
+        contentType: "image/webp",
+        upsert: false,
+        cacheControl: UPLOAD_CACHE_CONTROL,
+      }),
+    ]);
+    if (mainResult.error) throw mainResult.error;
+    if (thumbResult.error) throw thumbResult.error;
+
+    const mainUrl = supabase.storage.from("user-uploads").getPublicUrl(mainPath)
+      .data.publicUrl;
+    const thumbUrl = supabase.storage
+      .from("user-uploads")
+      .getPublicUrl(thumbPath).data.publicUrl;
+    return { mainUrl, thumbUrl };
+  }
+
+  async function resolveSlot(
+    slot: FileSlot,
+    postId: string,
+    tag: string,
+  ): Promise<UploadedImage | null> {
+    if (slot.file) return await uploadImage(slot.file, postId, tag);
+    if (isLikelyImageUrl(slot.externalUrl)) {
+      const trimmed = slot.externalUrl.trim();
+      return { mainUrl: trimmed, thumbUrl: trimmed };
+    }
+    return null;
   }
 
   async function submit() {
     setError(null);
-    if (!result.file) {
-      setError("Upload the result image.");
+    if (!slotIsFilled(result)) {
+      setError("Upload the result image or paste an image URL.");
       return;
     }
-    if (promptType === "remix" && !source.file) {
+    if (promptType === "remix" && !slotIsFilled(source)) {
       setError("Remix prompts need the input image too.");
       return;
     }
@@ -271,79 +324,44 @@ export function AddPromptDialog({
       setError("Pick a model and a platform.");
       return;
     }
-    if (attribution === "reference") {
-      if (extPlatform === "other") {
-        if (!extUrl.trim() && !extHandle.trim()) {
-          setError("Add a source URL or a creator handle.");
-          return;
-        }
-      } else if (!extHandle.trim()) {
-        setError("Add the creator's handle (e.g. @someone).");
-        return;
-      }
+    if (!parsedCreator) {
+      setError("Paste a valid source URL (https://…).");
+      return;
     }
 
     setSubmitting(true);
     try {
       const postId = crypto.randomUUID();
-      const resultUrl = await uploadImage(result.file, postId, "out");
-      const sourceUrl =
-        promptType === "remix" && source.file
-          ? await uploadImage(source.file, postId, "in")
-          : null;
+      const resultImage = await resolveSlot(result, postId, "out");
+      if (!resultImage) throw new Error("Result image is missing.");
+      const sourceImage =
+        promptType === "remix" ? await resolveSlot(source, postId, "in") : null;
 
-      // Extras only for standard prompts — upload each in order
       const extraUrls: string[] = [];
       if (promptType === "standard") {
         for (let i = 0; i < extras.length; i++) {
           const slot = extras[i];
           if (slot?.file) {
-            const url = await uploadImage(slot.file, postId, `x${i + 1}`);
-            extraUrls.push(url);
+            const uploaded = await uploadImage(slot.file, postId, `x${i + 1}`);
+            extraUrls.push(uploaded.mainUrl);
           }
         }
       }
 
-      // Determine attribution
-      let sourceUserLabel: string;
-      let sourceLinkForPost: string;
-      let extCreatorHandle: string | null = null;
-      let extCreatorUrl: string | null = null;
-      let extCreatorPlatform: string | null = null;
-
-      if (attribution === "reference") {
-        const rawHandle = extHandle.trim().replace(/^@+/, "");
-        const trimmedUrl = extUrl.trim();
-        if (extPlatform === "other") {
-          const host = hostnameFromUrl(trimmedUrl);
-          sourceUserLabel = rawHandle ? `@${rawHandle}` : host ?? "Web";
-          sourceLinkForPost = trimmedUrl || `promptfeed://web/${postId}`;
-          extCreatorHandle = rawHandle ? `@${rawHandle}` : null;
-          extCreatorUrl = trimmedUrl || null;
-          extCreatorPlatform = "other";
-        } else {
-          sourceUserLabel = `@${rawHandle}`;
-          const autoUrl = PLATFORM_THEME[extPlatform].urlPrefix + rawHandle;
-          sourceLinkForPost = trimmedUrl || autoUrl;
-          extCreatorHandle = `@${rawHandle}`;
-          extCreatorUrl = sourceLinkForPost;
-          extCreatorPlatform = extPlatform;
-        }
-      } else {
-        sourceUserLabel = profile?.handle
-          ? `@${profile.handle}`
-          : profile?.display_name ?? "@anonymous";
-        sourceLinkForPost =
-          selfSourceUrl.trim() || `promptfeed://${userId}/${postId}`;
-      }
+      if (!parsedCreator) throw new Error("Source URL missing.");
+      const sourceUserLabel = sourceDisplayLabel(parsedCreator);
+      const sourceLinkForPost = parsedCreator.url;
+      const extCreatorHandle = parsedCreator.handle;
+      const extCreatorUrl = parsedCreator.url;
+      const extCreatorPlatform = parsedCreator.platform;
 
       const supabase = createClient();
       const { error: insertErr } = await supabase.from("posts").insert({
         id: postId,
         owner_id: userId,
-        media_url: resultUrl,
+        media_url: resultImage.mainUrl,
         media_type: "image",
-        thumbnail_url: resultUrl,
+        thumbnail_url: resultImage.thumbUrl,
         prompt: prompt.trim(),
         model_slug: modelSlug,
         platform_slug: platformSlug,
@@ -351,7 +369,7 @@ export function AddPromptDialog({
         source_url: sourceLinkForPost,
         posted_at: new Date().toISOString(),
         prompt_type: promptType,
-        source_image_url: sourceUrl,
+        source_image_url: sourceImage?.mainUrl ?? null,
         extra_image_urls: extraUrls,
         external_creator_handle: extCreatorHandle,
         external_creator_url: extCreatorUrl,
@@ -377,13 +395,22 @@ export function AddPromptDialog({
     }
   }
 
+  function beautifyPrompt() {
+    const pretty = prettifyJson(prompt);
+    if (pretty !== null) setPrompt(pretty);
+  }
+
   const modelOptions: SelectOption<string>[] = models.map((m) => ({
     value: m.slug,
     label: m.name,
-    icon: <BrandSquare visual={modelVisual(m.slug)} size={20} />,
+    icon: <ModelBadge slug={m.slug} size={20} />,
     meta: `${formatCount(m.post_count)} posts`,
   }));
-  const platformOptions: SelectOption<string>[] = platforms.map((p) => ({
+  const hasOther = platforms.some((p) => p.slug === "other");
+  const platformList = hasOther
+    ? platforms
+    : [...platforms, { slug: "other", name: "Other / Web", post_count: 0 } as Platform];
+  const platformOptions: SelectOption<string>[] = platformList.map((p) => ({
     value: p.slug,
     label: p.name,
     icon: isPlatformSlug(p.slug) ? (
@@ -393,44 +420,25 @@ export function AddPromptDialog({
     ),
     meta: `${formatCount(p.post_count)} posts`,
   }));
-  const extPlatformOptions: SelectOption<PlatformSlug>[] = (
-    ["x", "instagram", "reddit", "youtube", "tiktok", "other"] as PlatformSlug[]
-  ).map((slug) => ({
-    value: slug,
-    label: PLATFORM_THEME[slug].label,
-    icon: <PlatformBadge platform={slug} size={20} rounded={5} />,
-  }));
-
-  const extIsOther = extPlatform === "other";
-
   const promptCount = prompt.length;
   const promptNearLimit = promptCount > PROMPT_MAX * 0.9;
 
   const canSubmit = useMemo(() => {
-    if (!result.file) return false;
-    if (promptType === "remix" && !source.file) return false;
+    if (!slotIsFilled(result)) return false;
+    if (promptType === "remix" && !slotIsFilled(source)) return false;
     if (prompt.trim().length < 6) return false;
     if (prompt.length > PROMPT_MAX) return false;
     if (!modelSlug || !platformSlug) return false;
-    if (attribution === "reference") {
-      if (extPlatform === "other") {
-        if (!extUrl.trim() && !extHandle.trim()) return false;
-      } else if (!extHandle.trim()) {
-        return false;
-      }
-    }
+    if (!parsedCreator) return false;
     return !submitting;
   }, [
-    result.file,
+    result,
     promptType,
-    source.file,
+    source,
     prompt,
     modelSlug,
     platformSlug,
-    attribution,
-    extHandle,
-    extUrl,
-    extPlatform,
+    parsedCreator,
     submitting,
   ]);
 
@@ -455,7 +463,7 @@ export function AddPromptDialog({
                   id="add-prompt-desc"
                   className="mt-0.5 text-[13px] text-text-muted"
                 >
-                  Attribute it to yourself or reference the original creator.
+                  Reference the original creator and attach the source.
                 </p>
               </div>
             </div>
@@ -470,10 +478,9 @@ export function AddPromptDialog({
             </Dialog.Close>
           </div>
 
-          {/* ---------- BODY: two columns, content-sized ---------- */}
           <div className="grid grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1.05fr)_minmax(440px,1fr)]">
-            {/* LEFT: remix toggle + drop zones (fixed aspect, landscape-friendly) */}
-            <div className="flex flex-col gap-3 border-b bg-surface-2/40 p-5 lg:border-b-0 lg:border-r">
+            {/* LEFT: image area */}
+            <div className="flex flex-col gap-3 overflow-y-auto border-b bg-surface-2/40 p-5 lg:border-b-0 lg:border-r">
               <label className="flex items-center gap-2.5 rounded-[10px] border bg-surface px-3 py-2 text-[13px] font-medium text-text">
                 <input
                   type="checkbox"
@@ -492,32 +499,35 @@ export function AddPromptDialog({
 
               {promptType === "remix" ? (
                 <div className="grid grid-cols-2 gap-3">
-                  <AspectDropZone
+                  <SlotPicker
                     label="Input"
                     inputRef={sourceInputRef}
                     slot={source}
                     onPick={(f) => pickFile("source", f)}
                     onClear={() => clearSlot("source")}
+                    onUrlChange={(v) => setSlotExternalUrl("source", v)}
                     dragging={dragging === "source"}
                     onDragState={(d) => setDragging(d ? "source" : null)}
                   />
-                  <AspectDropZone
+                  <SlotPicker
                     label="Output"
                     inputRef={resultInputRef}
                     slot={result}
                     onPick={(f) => pickFile("result", f)}
                     onClear={() => clearSlot("result")}
+                    onUrlChange={(v) => setSlotExternalUrl("result", v)}
                     dragging={dragging === "result"}
                     onDragState={(d) => setDragging(d ? "result" : null)}
                   />
                 </div>
               ) : (
-                <AspectDropZone
+                <SlotPicker
                   label="Image"
                   inputRef={resultInputRef}
                   slot={result}
                   onPick={(f) => pickFile("result", f)}
                   onClear={() => clearSlot("result")}
+                  onUrlChange={(v) => setSlotExternalUrl("result", v)}
                   dragging={dragging === "result"}
                   onDragState={(d) => setDragging(d ? "result" : null)}
                 />
@@ -540,134 +550,101 @@ export function AddPromptDialog({
                   </div>
                 </div>
               ) : null}
-
-              <p className="text-[11px] text-text-subtle">
-                Any aspect ratio works — 16:9 landscape, 1:1 square, 9:16
-                portrait. Cards show a <b>+N</b> badge when a post has extras.
-              </p>
             </div>
 
             {/* RIGHT: form */}
-            <div className="flex flex-col gap-3.5 p-5">
-              {/* Attribution */}
-              <Tabs.Root
-                value={attribution}
-                onValueChange={(v) => setAttribution(v as AttributionMode)}
-                className="flex flex-col gap-2"
-              >
-                <Tabs.List className="inline-flex gap-1 self-start rounded-[10px] border bg-surface-2/40 p-1">
-                  <Tabs.Trigger
-                    value="self"
-                    className="inline-flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12px] font-medium text-text-muted outline-none transition-colors data-[state=active]:bg-surface data-[state=active]:text-text data-[state=active]:shadow-surface"
-                  >
-                    <UserIcon className="h-3.5 w-3.5" strokeWidth={1.8} />
-                    Myself {profile?.handle ? `(@${profile.handle})` : ""}
-                  </Tabs.Trigger>
-                  <Tabs.Trigger
-                    value="reference"
-                    className="inline-flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12px] font-medium text-text-muted outline-none transition-colors data-[state=active]:bg-surface data-[state=active]:text-text data-[state=active]:shadow-surface"
-                  >
-                    <AtSign className="h-3.5 w-3.5" strokeWidth={1.8} />
-                    Another creator
-                  </Tabs.Trigger>
-                </Tabs.List>
-
-                <Tabs.Content value="self" className="outline-none">
-                  <div className="flex items-center gap-2 rounded-[10px] border bg-surface px-3 py-2.5 focus-within:border-border-strong">
-                    <LinkIcon
-                      className="h-3.5 w-3.5 shrink-0 text-text-subtle"
-                      strokeWidth={1.8}
+            <div className="flex flex-col gap-3.5 overflow-y-auto p-5">
+              {/* Source URL — single field, platform + handle parsed from it */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-[12px] font-medium text-text-muted">
+                  <LinkIcon className="h-3.5 w-3.5" strokeWidth={1.8} />
+                  Source URL<span className="text-red-500">*</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-[10px] border bg-surface px-3 py-2.5 focus-within:border-border-strong">
+                  <LinkIcon
+                    className="h-3.5 w-3.5 shrink-0 text-text-subtle"
+                    strokeWidth={1.8}
+                  />
+                  <input
+                    value={creatorUrl}
+                    onChange={(e) => setCreatorUrl(e.target.value)}
+                    placeholder="https://x.com/handle, instagram.com/handle, or any URL"
+                    className="min-w-0 flex-1 bg-transparent text-[13px] text-text placeholder:text-text-subtle focus:outline-none"
+                  />
+                </div>
+                {parsedCreator ? (
+                  <div className="flex items-center gap-2 rounded-[8px] border bg-surface-2/60 px-2.5 py-1.5 text-[12px]">
+                    <PlatformBadge
+                      platform={parsedCreator.platform}
+                      size={18}
+                      rounded={5}
                     />
-                    <input
-                      value={selfSourceUrl}
-                      onChange={(e) => setSelfSourceUrl(e.target.value)}
-                      placeholder="Your source URL (optional)"
-                      className="min-w-0 flex-1 bg-transparent text-[13px] text-text placeholder:text-text-subtle focus:outline-none"
-                    />
+                    <span className="font-semibold text-text">
+                      {sourceDisplayLabel(parsedCreator)}
+                    </span>
+                    {parsedCreator.handle === null &&
+                    parsedCreator.platform !== "other" ? (
+                      <span className="text-text-subtle">
+                        · no handle in URL — will link to source
+                      </span>
+                    ) : null}
                   </div>
-                </Tabs.Content>
-
-                <Tabs.Content value="reference" className="outline-none">
-                  <div className="grid grid-cols-[160px_minmax(0,1fr)] gap-2">
-                    <PrettySelect
-                      value={extPlatform}
-                      onValueChange={(v) => setExtPlatform(v)}
-                      options={extPlatformOptions}
-                      ariaLabel="External platform"
-                    />
-                    <div className="flex items-center gap-2 rounded-[10px] border bg-surface px-3 py-2.5 focus-within:border-border-strong">
-                      <AtSign
-                        className="h-3.5 w-3.5 shrink-0 text-text-subtle"
-                        strokeWidth={1.8}
-                      />
-                      <input
-                        value={extHandle}
-                        onChange={(e) =>
-                          setExtHandle(e.target.value.replace(/^@+/, ""))
-                        }
-                        placeholder={
-                          extIsOther
-                            ? "handle (optional)"
-                            : "handle (required)"
-                        }
-                        className="min-w-0 flex-1 bg-transparent text-[13px] text-text placeholder:text-text-subtle focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2 rounded-[10px] border bg-surface px-3 py-2.5 focus-within:border-border-strong">
-                    <LinkIcon
-                      className="h-3.5 w-3.5 shrink-0 text-text-subtle"
-                      strokeWidth={1.8}
-                    />
-                    <input
-                      value={extUrl}
-                      onChange={(e) => setExtUrl(e.target.value)}
-                      placeholder={
-                        extIsOther
-                          ? "Source URL (required — https://…)"
-                          : `Source URL (optional — ${PLATFORM_THEME[extPlatform].urlPrefix}...)`
-                      }
-                      className="min-w-0 flex-1 bg-transparent text-[13px] text-text placeholder:text-text-subtle focus:outline-none"
-                    />
-                  </div>
-                  {extIsOther ? (
-                    <p className="mt-1.5 text-[11px] text-text-subtle">
-                      Use this when the source isn&apos;t a social profile — a
-                      blog, portfolio, article, or any webpage.
-                    </p>
-                  ) : null}
-                </Tabs.Content>
-              </Tabs.Root>
+                ) : creatorUrl.trim() ? (
+                  <p className="text-[11px] text-red-500">
+                    Could not parse URL — paste a valid https:// link.
+                  </p>
+                ) : null}
+              </div>
 
               <div className="h-px w-full bg-border" />
 
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-[12px] font-medium text-text-muted">
-                  <span>
-                    Prompt<span className="ml-0.5 text-red-500">*</span>
+                <div className="flex items-center justify-between gap-2 text-[12px] font-medium text-text-muted">
+                  <span className="flex items-center gap-2">
+                    Prompt<span className="text-red-500">*</span>
+                    {isJson ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
+                        <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
+                        JSON
+                      </span>
+                    ) : null}
                   </span>
-                  <span
-                    className={cn(
-                      "tabular-nums text-[11px]",
-                      promptNearLimit ? "text-amber-500" : "text-text-subtle",
-                      promptCount > PROMPT_MAX && "text-red-500",
-                    )}
-                  >
-                    {promptCount} / {PROMPT_MAX}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {isJson ? (
+                      <button
+                        type="button"
+                        onClick={beautifyPrompt}
+                        className="text-[11px] font-medium text-text-muted underline-offset-2 hover:text-text hover:underline"
+                      >
+                        Beautify
+                      </button>
+                    ) : null}
+                    <span
+                      className={cn(
+                        "tabular-nums text-[11px]",
+                        promptNearLimit ? "text-amber-500" : "text-text-subtle",
+                        promptCount > PROMPT_MAX && "text-red-500",
+                      )}
+                    >
+                      {promptCount} / {PROMPT_MAX}
+                    </span>
+                  </div>
                 </div>
                 <textarea
                   ref={textareaRef}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   maxLength={PROMPT_MAX + 100}
-                  rows={6}
-                  placeholder="Cinematic photograph of a cat astronaut, 35mm film grain…"
-                  className="resize-none rounded-[10px] border bg-surface px-3.5 py-2.5 text-[13px] leading-[1.55] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  rows={8}
+                  spellCheck={!isJson}
+                  placeholder={'Cinematic photograph of a cat astronaut…\n\nor JSON, e.g.:\n{ "subject": "cat", "lighting": "rim, cool" }'}
+                  className={cn(
+                    "resize-y rounded-[10px] border bg-surface px-3.5 py-2.5 text-[13px] leading-[1.55] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30",
+                    isJson && "font-mono text-[12.5px]",
+                  )}
                 />
               </div>
 
-              {/* Model + Platform */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[12px] font-medium text-text-muted">
@@ -707,15 +684,7 @@ export function AddPromptDialog({
             <div className="text-[11px] text-text-subtle">
               Will be published as{" "}
               <b className="text-text-muted">
-                {attribution === "reference"
-                  ? extHandle
-                    ? `@${extHandle}`
-                    : extIsOther
-                      ? hostnameFromUrl(extUrl) ?? "web source"
-                      : "@creator"
-                  : profile?.handle
-                    ? `@${profile.handle}`
-                    : "admin"}
+                {parsedCreator ? sourceDisplayLabel(parsedCreator) : "—"}
               </b>
             </div>
             <div className="flex items-center gap-2">
@@ -746,8 +715,6 @@ export function AddPromptDialog({
     </Dialog.Root>
   );
 }
-
-/* --------------- MiniSlot (square extra-image slot) --------------- */
 
 interface MiniSlotProps {
   slot: FileSlot;
@@ -800,8 +767,6 @@ function MiniSlot({ slot, onPick, onClear }: MiniSlotProps) {
   );
 }
 
-/* --------------- AspectDropZone (4:3 landscape-friendly) --------------- */
-
 interface AspectDropZoneProps {
   label: string;
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -821,6 +786,8 @@ function AspectDropZone({
   dragging,
   onDragState,
 }: AspectDropZoneProps) {
+  const previewUrl = slotPreviewUrl(slot);
+  const isExternal = !slot.file && Boolean(previewUrl);
   return (
     <label
       onDragEnter={(e) => {
@@ -839,84 +806,125 @@ function AspectDropZone({
       }}
       className={cn(
         "group relative flex aspect-[4/3] w-full cursor-pointer items-center justify-center overflow-hidden rounded-[14px] border-2 border-dashed bg-surface-2/60 transition-all",
-        slot.url
+        previewUrl
           ? "border-solid border-border bg-black"
           : "hover:border-border-strong hover:bg-surface-2",
         dragging && "border-accent bg-accent/5 ring-2 ring-accent/20",
       )}
     >
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          onChange={(e) => onPick(e.target.files?.[0] ?? null)}
-          className="sr-only"
-        />
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+        className="sr-only"
+      />
 
-        {slot.url ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={slot.url}
-              alt={label}
-              className="absolute inset-0 h-full w-full object-contain"
-            />
-            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-3 pt-10">
-              <div className="min-w-0 text-[11px] text-white/80">
-                <div className="truncate font-medium text-white">
-                  {slot.file?.name}
-                </div>
-                <div className="flex items-center gap-1.5 text-white/70">
-                  {slot.dims ? (
-                    <span>
-                      {slot.dims.w} × {slot.dims.h}
-                    </span>
-                  ) : null}
-                  {slot.file ? (
-                    <>
-                      <span>·</span>
-                      <span>{formatBytes(slot.file.size)}</span>
-                    </>
-                  ) : null}
-                </div>
+      {previewUrl ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt={label}
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-3 pt-10">
+            <div className="min-w-0 text-[11px] text-white/80">
+              <div className="truncate font-medium text-white">
+                {slot.file?.name ?? (isExternal ? "Linked image" : "")}
               </div>
-              <div className="flex shrink-0 gap-1.5">
+              <div className="flex items-center gap-1.5 text-white/70">
+                {slot.dims ? (
+                  <span>
+                    {slot.dims.w} × {slot.dims.h}
+                  </span>
+                ) : null}
+                {slot.file ? (
+                  <>
+                    <span>·</span>
+                    <span>{formatBytes(slot.file.size)}</span>
+                  </>
+                ) : null}
+                {isExternal ? (
+                  <span className="rounded-full bg-white/15 px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em]">
+                    URL
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-1.5">
+              {!isExternal ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-black">
                   <UploadCloud className="h-3 w-3" strokeWidth={2} />
                   Replace
                 </span>
-                <button
-                  type="button"
-                  aria-label="Remove image"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onClear();
-                  }}
-                  className="grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-red-500"
-                >
-                  <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center gap-3 px-6 text-center">
-            <div className="grid h-14 w-14 place-items-center rounded-full bg-surface text-text-muted shadow-surface">
-              <UploadCloud className="h-6 w-6" strokeWidth={1.6} />
-            </div>
-            <div>
-              <div className="text-[14px] font-semibold text-text">
-                {dragging ? "Drop it" : "Drag an image here"}
-              </div>
-              <div className="mt-0.5 text-[12px] text-text-muted">
-                or{" "}
-                <span className="underline decoration-text-subtle decoration-dotted underline-offset-2">
-                  click to browse
-                </span>
-              </div>
+              ) : null}
+              <button
+                type="button"
+                aria-label="Remove image"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onClear();
+                }}
+                className="grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-red-500"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
             </div>
           </div>
-        )}
+        </>
+      ) : (
+        <div className="flex flex-col items-center gap-3 px-6 text-center">
+          <div className="grid h-14 w-14 place-items-center rounded-full bg-surface text-text-muted shadow-surface">
+            <UploadCloud className="h-6 w-6" strokeWidth={1.6} />
+          </div>
+          <div>
+            <div className="text-[14px] font-semibold text-text">
+              {dragging ? "Drop it" : "Drag an image here"}
+            </div>
+            <div className="mt-0.5 text-[12px] text-text-muted">
+              or{" "}
+              <span className="underline decoration-text-subtle decoration-dotted underline-offset-2">
+                click to browse
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </label>
+  );
+}
+
+interface SlotPickerProps extends AspectDropZoneProps {
+  onUrlChange: (value: string) => void;
+}
+
+function SlotPicker({ onUrlChange, ...rest }: SlotPickerProps) {
+  const { slot } = rest;
+  const hasFile = Boolean(slot.file);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <AspectDropZone {...rest} />
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-[10px] border bg-surface px-2.5 py-1.5 transition-colors focus-within:border-border-strong",
+          hasFile && "opacity-50",
+        )}
+        title={hasFile ? "Clear the file to paste a URL" : undefined}
+      >
+        <LinkIcon
+          className="h-3.5 w-3.5 shrink-0 text-text-subtle"
+          strokeWidth={1.8}
+        />
+        <input
+          type="url"
+          value={slot.externalUrl}
+          onChange={(e) => onUrlChange(e.target.value)}
+          disabled={hasFile}
+          placeholder="…or paste an image URL"
+          className="min-w-0 flex-1 bg-transparent text-[12px] text-text placeholder:text-text-subtle focus:outline-none disabled:cursor-not-allowed"
+        />
+      </div>
+    </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Check } from "lucide-react";
 import { cn, formatCount } from "@/lib/utils";
 
@@ -12,21 +11,19 @@ export interface FilterOption {
 }
 
 interface Props {
-  paramKey: string;
   activeValue?: string;
   allLabel: string;
   options: FilterOption[];
+  onChange: (next: string | undefined) => void;
 }
 
 export function FilterDropdown({
-  paramKey,
   activeValue,
   allLabel,
   options,
+  onChange,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,11 +48,7 @@ export function FilterDropdown({
   }, [open]);
 
   function apply(next?: string) {
-    const sp = new URLSearchParams(searchParams.toString());
-    if (!next) sp.delete(paramKey);
-    else sp.set(paramKey, next);
-    const qs = sp.toString();
-    router.push(qs ? `/?${qs}` : "/");
+    onChange(next);
     setOpen(false);
   }
 

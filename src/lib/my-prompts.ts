@@ -4,7 +4,6 @@ import type { Post } from "@/types/domain";
 export interface MyPostStats {
   likes: number;
   saves: number;
-  followers: number;
 }
 
 export async function listMyPosts(userId: string): Promise<Post[]> {
@@ -22,12 +21,9 @@ export async function listMyPosts(userId: string): Promise<Post[]> {
  * Aggregate real engagement on a user's own post.
  * likes & saves come from the interaction tables (absolute truth).
  */
-export async function getMyPostStats(
-  postId: string,
-  sourceUser: string,
-): Promise<MyPostStats> {
+export async function getMyPostStats(postId: string): Promise<MyPostStats> {
   const supabase = await createClient();
-  const [likesRes, savesRes, followsRes] = await Promise.all([
+  const [likesRes, savesRes] = await Promise.all([
     supabase
       .from("post_likes")
       .select("*", { count: "exact", head: true })
@@ -36,15 +32,9 @@ export async function getMyPostStats(
       .from("post_saves")
       .select("*", { count: "exact", head: true })
       .eq("post_id", postId),
-    supabase
-      .from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("target_type", "user")
-      .eq("target_id", sourceUser),
   ]);
   return {
     likes: likesRes.count ?? 0,
     saves: savesRes.count ?? 0,
-    followers: followsRes.count ?? 0,
   };
 }

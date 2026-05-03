@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { SITE_URL, SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/site";
 import "./globals.css";
 
 const jetbrainsMono = JetBrains_Mono({
@@ -9,10 +10,59 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+const DEFAULT_TITLE = "PromptFeed — AI İçerik Keşif Platformu";
+
 export const metadata: Metadata = {
-  title: "PromptFeed — AI İçerik Keşif Platformu",
-  description:
-    "Twitter, Reddit, Instagram, YouTube ve TikTok'taki AI üretimi içerikleri, onları üreten prompt ile yan yana keşfedin.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: DEFAULT_TITLE,
+    template: "%s — PromptFeed",
+  },
+  description: DEFAULT_DESCRIPTION,
+  applicationName: SITE_NAME,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    url: SITE_URL,
+    locale: "tr_TR",
+    images: [
+      {
+        url: "/logos/og-default-1200x630.png",
+        width: 1200,
+        height: 630,
+        alt: SITE_NAME,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    images: ["/logos/og-twitter-1200x675.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
+  icons: {
+    icon: [
+      { url: "/logos/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/logos/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/logos/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/logos/apple-touch-icon-180x180.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  manifest: "/manifest.json",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
 };
 
 export default function RootLayout({

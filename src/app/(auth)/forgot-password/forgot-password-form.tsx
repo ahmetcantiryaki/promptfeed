@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, CheckCircle2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/browser";
+import { requestPasswordReset } from "./actions";
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
@@ -15,19 +15,27 @@ export function ForgotPasswordForm() {
     setLoading(true);
     setError(null);
     try {
-      const supabase = createClient();
       const redirectTo =
         typeof window !== "undefined"
           ? `${window.location.origin}/login`
-          : undefined;
-      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo,
-      });
-      if (err) {
-        setError(err.message);
+          : "";
+      const result = await requestPasswordReset(email, redirectTo);
+      if (result.success) {
+        setSent(true);
         return;
       }
-      setSent(true);
+      switch (result.error) {
+        case "invalid_email":
+          setError("Please enter a valid email address.");
+          break;
+        case "rate_limited":
+          setError("Too many attempts. Please try again in a few minutes.");
+          break;
+        default:
+          setError(
+            result.message ?? "Could not send reset link. Please try again.",
+          );
+      }
     } finally {
       setLoading(false);
     }
@@ -41,8 +49,7 @@ export function ForgotPasswordForm() {
           Check your email
         </div>
         <p className="text-[13px] text-text-muted">
-          If <b>{email}</b> is associated with an account, you&apos;ll receive a
-          password reset link shortly.
+          We&apos;ve sent a password reset link to <b>{email}</b>.
         </p>
       </div>
     );

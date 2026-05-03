@@ -3,7 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Loader2, Upload, Trash2, Plus, Wand2 } from "lucide-react";
+import {
+  X,
+  Loader2,
+  Upload,
+  Trash2,
+  Plus,
+  Wand2,
+  Link as LinkIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { Post } from "@/types/domain";
 import { createClient } from "@/lib/supabase/browser";
@@ -13,8 +21,7 @@ import {
   type UpdatePostInput,
 } from "@/lib/admin-post-actions";
 import { PrettySelect, type SelectOption } from "@/components/ui/select";
-import { BrandSquare } from "@/components/ui/brand-square";
-import { modelVisual } from "@/lib/brand";
+import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { cn } from "@/lib/utils";
 
@@ -28,12 +35,25 @@ interface PlatformOpt {
 }
 
 interface ImageSlot {
-  /** Existing remote URL (kept if no new file is chosen). */
+  /** Existing remote URL (kept if no new file is chosen and no externalUrl set). */
   url: string | null;
   /** Newly chosen file to upload. */
   file: File | null;
-  /** Local preview URL (object URL when file is set, otherwise the remote URL). */
+  /** Local preview URL (object URL when file is set, otherwise the remote/external URL). */
   preview: string | null;
+  /** Pasted external image URL — overrides any uploaded file when set. */
+  externalUrl: string;
+}
+
+function isHttpUrl(raw: string): boolean {
+  const v = raw.trim();
+  if (!v) return false;
+  try {
+    const u = new URL(v);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 interface Props {
@@ -47,7 +67,7 @@ interface Props {
 const EXTRA_LIMIT = 3;
 
 function makeSlot(url: string | null): ImageSlot {
-  return { url, file: null, preview: url };
+  return { url, file: null, preview: url, externalUrl: "" };
 }
 
 export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
@@ -133,7 +153,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
   const modelOptions: SelectOption<string>[] = models.map((m) => ({
     value: m.slug,
     label: m.name,
-    icon: <BrandSquare visual={modelVisual(m.slug)} size={18} />,
+    icon: <ModelBadge slug={m.slug} size={18} />,
   }));
   const platformOptions: SelectOption<string>[] = platforms.map((p) => ({
     value: p.slug,
@@ -154,9 +174,24 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
       if (!f) return;
       const preview = URL.createObjectURL(f);
       objectUrlsRef.current.push(preview);
-      setter({ url: currentUrl, file: f, preview });
+      setter({ url: currentUrl, file: f, preview, externalUrl: "" });
     };
     input.click();
+  }
+
+  function setExternalUrl(
+    setter: (next: ImageSlot) => void,
+    current: ImageSlot,
+    value: string,
+  ) {
+    const trimmed = value.trim();
+    const valid = isHttpUrl(trimmed);
+    setter({
+      url: current.url,
+      file: null,
+      externalUrl: value,
+      preview: valid ? trimmed : current.url,
+    });
   }
 
   function replaceMain() {
@@ -206,7 +241,10 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
         external_creator_platform: extPlatform || null,
       };
 
-      if (main.file) {
+      if (isHttpUrl(main.externalUrl)) {
+        patch.media_url = main.externalUrl.trim();
+        patch.thumbnail_url = main.externalUrl.trim();
+      } else if (main.file) {
         const url = await uploadReplacementImage(
           userId,
           post.id,
@@ -218,7 +256,9 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
       }
 
       if (isRemix) {
-        if (source.file) {
+        if (isHttpUrl(source.externalUrl)) {
+          patch.source_image_url = source.externalUrl.trim();
+        } else if (source.file) {
           const url = await uploadReplacementImage(
             userId,
             post.id,
@@ -235,7 +275,9 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
       const newExtras: string[] = [];
       for (let i = 0; i < extras.length; i++) {
         const e = extras[i]!;
-        if (e.file) {
+        if (isHttpUrl(e.externalUrl)) {
+          newExtras.push(e.externalUrl.trim());
+        } else if (e.file) {
           const url = await uploadReplacementImage(
             userId,
             post.id,
@@ -299,14 +341,20 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
                 <ImageEditorCard
                   label={isRemix ? "Output (sonuç)" : "Ana görsel"}
                   preview={main.preview}
+                  externalUrl={main.externalUrl}
+                  hasFile={Boolean(main.file)}
                   onReplace={replaceMain}
+                  onUrlChange={(v) => setExternalUrl(setMain, main, v)}
                 />
                 {isRemix ? (
                   <ImageEditorCard
                     label="Input (kaynak)"
                     badge={<Wand2 className="h-3 w-3" strokeWidth={2} />}
                     preview={source.preview}
+                    externalUrl={source.externalUrl}
+                    hasFile={Boolean(source.file)}
                     onReplace={replaceSource}
+                    onUrlChange={(v) => setExternalUrl(setSource, source, v)}
                   />
                 ) : null}
               </div>
@@ -342,8 +390,26 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
                           key={i}
                           label={`#${i + 1}`}
                           preview={e.preview}
+                          externalUrl={e.externalUrl}
+                          hasFile={Boolean(e.file)}
                           onReplace={() => replaceExtra(i)}
                           onRemove={() => removeExtra(i)}
+                          onUrlChange={(v) =>
+                            setExtras((prev) =>
+                              prev.map((slot, j) =>
+                                j === i
+                                  ? {
+                                      url: slot.url,
+                                      file: null,
+                                      externalUrl: v,
+                                      preview: isHttpUrl(v)
+                                        ? v.trim()
+                                        : slot.url,
+                                    }
+                                  : slot,
+                              ),
+                            )
+                          }
                           compact
                         />
                       ))}
@@ -464,7 +530,10 @@ function Field({
 interface ImageEditorCardProps {
   label: string;
   preview: string | null;
+  externalUrl: string;
+  hasFile: boolean;
   onReplace: () => void;
+  onUrlChange: (next: string) => void;
   onRemove?: () => void;
   badge?: React.ReactNode;
   compact?: boolean;
@@ -473,16 +542,25 @@ interface ImageEditorCardProps {
 function ImageEditorCard({
   label,
   preview,
+  externalUrl,
+  hasFile,
   onReplace,
+  onUrlChange,
   onRemove,
   badge,
   compact,
 }: ImageEditorCardProps) {
+  const isExternal = !hasFile && isHttpUrl(externalUrl);
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
         {badge}
         {label}
+        {isExternal ? (
+          <span className="rounded-full border border-text/20 bg-surface-2 px-1.5 py-[1px] text-[9px] font-semibold tracking-[0.06em] text-text-muted">
+            URL
+          </span>
+        ) : null}
       </div>
       <div
         className={cn(
@@ -522,6 +600,26 @@ function ImageEditorCard({
             <Trash2 className="h-3 w-3" strokeWidth={2} />
           </button>
         ) : null}
+      </div>
+      <div
+        className={cn(
+          "flex items-center gap-1.5 rounded-[8px] border bg-surface px-2 py-1 transition-colors focus-within:border-border-strong",
+          hasFile && "opacity-50",
+        )}
+        title={hasFile ? "Yüklenen dosyayı kaldır, sonra URL yapıştır" : undefined}
+      >
+        <LinkIcon
+          className="h-3 w-3 shrink-0 text-text-subtle"
+          strokeWidth={1.8}
+        />
+        <input
+          type="url"
+          value={externalUrl}
+          onChange={(e) => onUrlChange(e.target.value)}
+          disabled={hasFile}
+          placeholder="…veya görsel URL'si yapıştır"
+          className="min-w-0 flex-1 bg-transparent text-[11px] text-text placeholder:text-text-subtle focus:outline-none disabled:cursor-not-allowed"
+        />
       </div>
     </div>
   );

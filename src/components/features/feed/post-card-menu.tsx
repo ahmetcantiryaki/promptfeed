@@ -18,8 +18,10 @@ import type { Post } from "@/types/domain";
 import { cn } from "@/lib/utils";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { deletePostWithToast } from "@/lib/admin-post-actions";
+import { safeHref } from "@/lib/safe-url";
 import { EditPostDialog } from "@/components/features/admin/edit-post-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ReportPostDialog } from "@/components/features/report/report-post-dialog";
 
 interface Props {
   post: Post;
@@ -27,10 +29,11 @@ interface Props {
 }
 
 export function PostCardMenu({ post, tone = "light" }: Props) {
-  const { isAdmin } = useInteractions();
+  const { isAdmin, isAuthed } = useInteractions();
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   async function copyPrompt() {
     try {
@@ -88,7 +91,8 @@ export function PostCardMenu({ post, tone = "light" }: Props) {
             </Item>
             <Item
               onSelect={() => {
-                window.open(post.source_url, "_blank", "noopener,noreferrer");
+                const safe = safeHref(post.source_url);
+                if (safe) window.open(safe, "_blank", "noopener,noreferrer");
               }}
               icon={<ExternalLink className="h-3.5 w-3.5" />}
             >
@@ -125,7 +129,20 @@ export function PostCardMenu({ post, tone = "light" }: Props) {
               <>
                 <DropdownMenu.Separator className="my-1 h-px bg-border" />
                 <Item
-                  onSelect={() => toast("Reported. Thanks for the heads up.")}
+                  onSelect={() => {
+                    if (!isAuthed) {
+                      toast("Önce giriş yapmalısın.", {
+                        action: {
+                          label: "Sign in",
+                          onClick: () => {
+                            window.location.href = "/login";
+                          },
+                        },
+                      });
+                      return;
+                    }
+                    setReportOpen(true);
+                  }}
                   icon={<Flag className="h-3.5 w-3.5" />}
                   danger
                 >
@@ -156,6 +173,13 @@ export function PostCardMenu({ post, tone = "light" }: Props) {
           tone="danger"
           icon={<Trash2 className="h-5 w-5" strokeWidth={2} />}
           onConfirm={onDelete}
+        />
+      ) : null}
+      {!isAdmin && reportOpen ? (
+        <ReportPostDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          postId={post.id}
         />
       ) : null}
     </>

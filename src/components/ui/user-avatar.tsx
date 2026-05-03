@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { User as UserIcon } from "lucide-react";
 import type { AvatarConfig } from "@/types/domain";
 
 const NiceAvatar = dynamic(() => import("react-nice-avatar"), {
@@ -14,16 +15,6 @@ interface Props {
   email?: string | null;
   size?: number;
   className?: string;
-}
-
-function initials(email?: string | null): string {
-  if (!email) return "U";
-  const local = email.split("@")[0] ?? "";
-  const parts = local.split(/[._-]/).filter(Boolean);
-  if (parts.length >= 2) {
-    return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
-  }
-  return (local.slice(0, 2) || "U").toUpperCase();
 }
 
 export function UserAvatar({ config, url, email, size = 32, className }: Props) {
@@ -67,23 +58,33 @@ export function UserAvatar({ config, url, email, size = 32, className }: Props) 
     );
   }
 
+  const iconSize = Math.round(size * 0.55);
   return (
     <div
       className={className}
       style={{
         width: size,
         height: size,
+        minWidth: size,
+        minHeight: size,
         borderRadius: "50%",
         background: "var(--surface-2)",
-        color: "var(--text)",
-        display: "grid",
-        placeItems: "center",
-        fontSize: Math.round(size * 0.38),
-        fontWeight: 600,
+        color: "var(--text-muted)",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        lineHeight: 0,
         flexShrink: 0,
+        boxSizing: "border-box",
       }}
+      aria-label={email ?? "user"}
     >
-      {initials(email)}
+      <UserIcon
+        width={iconSize}
+        height={iconSize}
+        strokeWidth={1.8}
+        style={{ display: "block", width: iconSize, height: iconSize }}
+      />
     </div>
   );
 }

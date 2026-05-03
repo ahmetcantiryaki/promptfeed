@@ -40,14 +40,14 @@ export const PLATFORM_THEME: Record<PlatformSlug, PlatformTheme> = {
     urlPrefix: "https://tiktok.com/@",
   },
   other: {
-    bg: "var(--surface-2)",
-    fg: "var(--text)",
-    label: "Other / Web",
+    bg: "#111827",
+    fg: "#ffffff",
+    label: "Web",
     urlPrefix: "",
   },
 };
 
-// simple-icons SVG paths
+// simple-icons SVG paths (filled, viewBox 0 0 24 24)
 const PATHS: Record<PlatformSlug, string> = {
   x: "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z",
   reddit:
@@ -58,9 +58,9 @@ const PATHS: Record<PlatformSlug, string> = {
     "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z",
   tiktok:
     "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z",
-  // Globe-style glyph for Other / Web
+  // Globe (web) — solid filled style to match other platform glyphs
   other:
-    "M12 2a10 10 0 100 20 10 10 0 000-20zm0 2c1.66 0 3.16 1.79 3.87 4.5H8.13C8.84 5.79 10.34 4 12 4zM4.07 11h3.06c.05-1.04.19-2.05.4-3H5.1A8.04 8.04 0 004.07 11zm0 2a8.04 8.04 0 001.03 3h2.43c-.21-.95-.35-1.96-.4-3H4.07zm3.06-2h9.74c-.05-1.04-.19-2.05-.4-3H7.53c-.21.95-.35 1.96-.4 3zm0 2c.05 1.04.19 2.05.4 3h8.94c.21-.95.35-1.96.4-3H7.13zm9.74-2h3.06a8.04 8.04 0 00-1.03-3h-2.43c.21.95.35 1.96.4 3zm0 2c-.05 1.04-.19 2.05-.4 3h2.43a8.04 8.04 0 001.03-3h-3.06zM12 20c-1.66 0-3.16-1.79-3.87-4.5h7.74C15.16 18.21 13.66 20 12 20z",
+    "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93C7.05 19.44 4 16.08 4 12c0-.62.08-1.21.21-1.79L9 15v1a2 2 0 0 0 2 2v1.93zM17.9 17.39A1.99 1.99 0 0 0 16 16h-1v-3a1 1 0 0 0-1-1H8v-2h2a1 1 0 0 0 1-1V7h2a2 2 0 0 0 2-2v-.41C17.93 5.78 20 8.65 20 12c0 2.08-.8 3.97-2.1 5.39z",
 };
 
 export function isPlatformSlug(slug: string): slug is PlatformSlug {
@@ -100,7 +100,8 @@ export function PlatformBadge({
   className,
 }: BadgeProps) {
   const theme = PLATFORM_THEME[platform];
-  const glyphSize = Math.round(size * 0.6);
+  const isWeb = platform === "other";
+  const glyphSize = Math.round(size * (isWeb ? 1 : 0.62));
   return (
     <span
       className={className}
@@ -109,9 +110,9 @@ export function PlatformBadge({
         placeItems: "center",
         width: size,
         height: size,
-        borderRadius: rounded,
-        background: theme.bg,
-        color: theme.fg,
+        borderRadius: isWeb ? 0 : rounded,
+        background: isWeb ? "transparent" : theme.bg,
+        color: isWeb ? "var(--text)" : theme.fg,
         flexShrink: 0,
       }}
     >

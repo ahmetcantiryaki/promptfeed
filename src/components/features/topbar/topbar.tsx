@@ -7,11 +7,9 @@ import type {
   Profile,
   SocialAccount,
 } from "@/types/domain";
-import type { NotificationRow } from "@/lib/notifications";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
 import { AddPromptButton } from "./add-prompt-button";
-import { NotificationButton } from "./notification-button";
 import { CreditsStrip } from "./credits-strip";
 
 interface Props {
@@ -23,8 +21,6 @@ interface Props {
   models: Model[];
   platforms: Platform[];
   isAdmin?: boolean;
-  notifications?: NotificationRow[];
-  unreadCount?: number;
 }
 
 export function Topbar({
@@ -36,8 +32,6 @@ export function Topbar({
   models,
   platforms,
   isAdmin = false,
-  notifications = [],
-  unreadCount = 0,
 }: Props) {
   return (
     <header className="flex h-[60px] shrink-0 items-center gap-3 border-b bg-surface px-6">
@@ -56,11 +50,6 @@ export function Topbar({
               socials={socials}
             />
           ) : null}
-          <NotificationButton
-            userId={user.id}
-            initialItems={notifications}
-            initialUnread={unreadCount}
-          />
           <ThemeToggle />
           <UserMenu
             user={user}
