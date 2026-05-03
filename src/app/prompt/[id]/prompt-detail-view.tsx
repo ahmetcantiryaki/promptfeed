@@ -15,7 +15,7 @@ import type { Post, SocialAccount } from "@/types/domain";
 import type { OwnerInfo } from "@/lib/posts";
 import { cn, formatCount, timeAgo } from "@/lib/utils";
 import { ModelBadge } from "@/lib/model-icon";
-import { PlatformBadge, PLATFORM_THEME, isPlatformSlug } from "@/lib/platform-icon";
+import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { prettyModel, prettyPlatform } from "@/lib/labels";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { tryParseJson, prettifyJson } from "@/lib/prompt-format";
@@ -216,19 +216,16 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
 }
 
 function DetailHeader({ post }: { post: Post }) {
+  // Header always links to the original source post — never to the
+  // creator's profile, even when external_creator_url is present.
   const sourceUrl = safeHref(
-    post.external_creator_url ??
-      (post.source_url && !post.source_url.startsWith("promptfeed://")
-        ? post.source_url
-        : null),
+    post.source_url && !post.source_url.startsWith("promptfeed://")
+      ? post.source_url
+      : null,
   );
   const platform = post.external_creator_platform ?? post.platform_slug;
   const handle = post.external_creator_handle;
-  const label =
-    handle ??
-    (isPlatformSlug(platform)
-      ? PLATFORM_THEME[platform].label
-      : prettyPlatform(post.platform_slug));
+  const label = handle ?? "Source post";
 
   const inner = (
     <>

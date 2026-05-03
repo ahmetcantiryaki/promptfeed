@@ -12,7 +12,6 @@ import {
   Share2,
   Braces,
 } from "lucide-react";
-import { PLATFORM_THEME } from "@/lib/platform-icon";
 import { toast } from "sonner";
 import type { Post } from "@/types/domain";
 import type { OwnerInfo } from "@/lib/posts";
@@ -252,19 +251,16 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
 }
 
 function DetailHeader({ post }: { post: Post }) {
+  // Header always links to the original source post — never to the
+  // creator's profile, even when external_creator_url is present.
   const sourceUrl = safeHref(
-    post.external_creator_url ??
-      (post.source_url && !post.source_url.startsWith("promptfeed://")
-        ? post.source_url
-        : null),
+    post.source_url && !post.source_url.startsWith("promptfeed://")
+      ? post.source_url
+      : null,
   );
   const platform = post.external_creator_platform ?? post.platform_slug;
   const handle = post.external_creator_handle;
-  const label =
-    handle ??
-    (isPlatformSlug(platform)
-      ? PLATFORM_THEME[platform].label
-      : prettyPlatform(post.platform_slug));
+  const label = handle ?? "Source post";
 
   const inner = (
     <>

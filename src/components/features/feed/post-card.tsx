@@ -20,7 +20,8 @@ import { PostContextMenuWrapper } from "./post-context-menu";
 import { safeHref } from "@/lib/safe-url";
 
 function externalSourceUrl(post: Post): string | null {
-  const candidate = post.external_creator_url ?? post.source_url ?? null;
+  // Always points to the original source post — never the creator's profile.
+  const candidate = post.source_url ?? null;
   if (!candidate) return null;
   if (candidate.startsWith("promptfeed://")) return null;
   return safeHref(candidate);
