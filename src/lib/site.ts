@@ -14,7 +14,7 @@ export const SITE_URL: string = (() => {
 
 export const SITE_NAME = "PromptFeed";
 export const DEFAULT_DESCRIPTION =
-  "Sosyal medyada gördüğün her AI görselinin arkasındaki promptu keşfet. Midjourney, DALL·E, Flux, Stable Diffusion ve daha fazlasından kürate edilmiş binlerce prompt — kopyala, remixle, kendi versiyonunu üret.";
+  "Sosyal medyadaki AI görsellerin promptlarını tek akışta keşfet. Midjourney, DALL·E, Flux ve daha fazlasından kürate edilmiş binlerce prompt — kopyala, remixle.";
 
 /** Default OG image (used on every page unless explicitly overridden). */
 export const DEFAULT_OG_IMAGE = {

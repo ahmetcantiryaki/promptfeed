@@ -10,7 +10,8 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-const DEFAULT_TITLE = "PromptFeed — AI İçerik Keşif Platformu";
+const DEFAULT_TITLE =
+  "PromptFeed — AI görsel promptlarını keşfet, kopyala, remixle";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

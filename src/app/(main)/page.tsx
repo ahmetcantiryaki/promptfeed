@@ -61,15 +61,15 @@ export async function generateMetadata({
   const segments: string[] = [];
   if (params.model) segments.push(prettyModel(params.model));
   if (params.platform) segments.push(prettyPlatform(params.platform));
-  if (params.sort === "top") segments.push("Top liked");
+  if (params.sort === "top") segments.push("Trend");
   const title =
     segments.length > 0
-      ? `${segments.join(" · ")} prompts`
-      : "Discover AI prompts";
+      ? `${segments.join(" · ")} promptları — örnek görsellerle keşfet`
+      : "AI görsel promptlarını keşfet, kopyala, remixle";
   const description =
     segments.length > 0
-      ? `Browse curated AI prompts filtered by ${segments.join(", ")}.`
-      : "Browse curated AI image prompts and the originals that inspired them.";
+      ? `${segments.join(", ")} ile üretilmiş AI görsellerin promptlarını keşfet, kopyala ve remixle. Sosyal medyadaki en iyi örneklerden kürate edilmiş arşiv.`
+      : "Sosyal medyadaki AI görsellerin promptlarını tek akışta keşfet. Midjourney, DALL·E, Flux ve daha fazlasından kürate edilmiş binlerce prompt — kopyala, remixle.";
   return {
     title,
     description,
