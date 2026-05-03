@@ -88,21 +88,13 @@ export function ProfileSetupDialog({
               profile={profile}
               socials={socials}
               onSaved={() => onOpenChange(false)}
+              secondaryAction={
+                !isAdmin
+                  ? { label: "Maybe later", onClick: () => onOpenChange(false) }
+                  : undefined
+              }
             />
           </div>
-
-          {!isAdmin ? (
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t bg-surface-2/40 px-6 py-3">
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  className="rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
-                >
-                  Maybe later
-                </button>
-              </Dialog.Close>
-            </div>
-          ) : null}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

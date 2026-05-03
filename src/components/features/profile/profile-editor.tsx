@@ -32,6 +32,8 @@ interface Props {
   onSaved?: () => void;
   /** When true, show the secondary "Download PNG" action. Default true. */
   showDownload?: boolean;
+  /** When provided, renders a secondary action (e.g. "Maybe later") to the left of Save profile. */
+  secondaryAction?: { label: string; onClick: () => void };
 }
 
 function handleFromEmail(email: string | undefined): string {
@@ -58,6 +60,7 @@ export function ProfileEditor({
   socials,
   onSaved,
   showDownload = true,
+  secondaryAction,
 }: Props) {
   const router = useRouter();
   const editorRef = useRef<AvatarEditorHandle>(null);
@@ -274,19 +277,30 @@ export function ProfileEditor({
         <div className="text-[11px] text-text-subtle">
           {dirty ? "Unsaved changes" : "All changes saved"}
         </div>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || !dirty}
-          className="inline-flex items-center gap-1.5 rounded-[10px] border border-accent bg-accent px-4 py-2 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" strokeWidth={2} />
-          )}
-          Save profile
-        </button>
+        <div className="flex items-center gap-2">
+          {secondaryAction ? (
+            <button
+              type="button"
+              onClick={secondaryAction.onClick}
+              className="rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+            >
+              {secondaryAction.label}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || !dirty}
+            className="inline-flex items-center gap-1.5 rounded-[10px] border border-accent bg-accent px-4 py-2 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" strokeWidth={2} />
+            )}
+            Save profile
+          </button>
+        </div>
       </div>
     </div>
   );
