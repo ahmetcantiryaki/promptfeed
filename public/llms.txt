@@ -1,0 +1,32 @@
+# PromptFeed
+
+> AI ile üretilmiş görsellerin arkasındaki promptları keşfet ve kopyala. Twitter/X, Instagram, Reddit, YouTube ve TikTok'taki AI içeriklerini, onları üreten promptlarla yan yana sunan bir keşif platformu.
+
+PromptFeed, sosyal medyada öne çıkan Midjourney, DALL·E, Flux, Stable Diffusion, Sora ve diğer modellerle üretilmiş görselleri kürate eder. Her postta görselin yanında onu üreten prompt (gerektiğinde JSON formatında) tek tıkla kopyalanabilir, klasörlerde organize edilebilir ve remix referansı olarak kullanılabilir.
+
+Hedef kullanıcılar: AI sanatçıları, prompt mühendisleri, içerik üreticileri ve görsel araştırması yapan tasarımcılar.
+
+## Public sayfalar
+- [Discover feed](https://promptfeed.app/): En güncel ve trend AI promptları içeren ana akış. Model ve platform bazlı filtrelenebilir.
+- [Trending prompts](https://promptfeed.app/?sort=top): En çok beğenilen promptlar.
+- [Filter by model](https://promptfeed.app/?model=midjourney): Belirli bir AI modeline göre filtrelenmiş feed (`?model=<slug>`).
+- [Filter by platform](https://promptfeed.app/?platform=x): Belirli bir sosyal platformun içerikleri (`?platform=<slug>`).
+
+## Veri yapısı
+Her prompt aşağıdaki bilgileri içerir:
+- Görsel (single image, multi-image carousel veya remix input/output)
+- Prompt metni (düz metin veya JSON)
+- Üretim modeli (örn. Midjourney v7, Flux Dev, Sora)
+- Orijinal kaynak platform ve yaratıcı handle
+- Kaynak URL (orijinal post bağlantısı)
+- Yayın tarihi, beğeni ve kaydetme istatistikleri
+- Prompt tipi: standard veya remix (image-to-image)
+
+## Erişim ve kısıtlar
+- Anasayfa ve filtre kombinasyonları indekslenebilir.
+- Bireysel prompt detay sayfaları (`/prompt/<id>`) `noindex` olarak işaretlidir; arama motoru sonuçlarında çıkmaz ancak link paylaşımında OpenGraph önizlemesi çalışır.
+- Kullanıcı profilleri, kayıt klasörleri (`/?view=saved`), admin paneli ve auth sayfaları crawl edilmez (`robots.txt` `disallow`).
+- API endpointleri (`/api/posts`, `/api/saved`, `/api/report`) rate-limit'lidir, otomatik scraping önerilmez.
+
+## İletişim
+- İtiraz, telif veya iş birliği: ahmetcan.1855@gmail.com

@@ -14,7 +14,17 @@ export const SITE_URL: string = (() => {
 
 export const SITE_NAME = "PromptFeed";
 export const DEFAULT_DESCRIPTION =
-  "Twitter, Reddit, Instagram, YouTube ve TikTok'taki AI üretimi içerikleri, onları üreten prompt ile yan yana keşfedin.";
+  "Sosyal medyada gördüğün her AI görselinin arkasındaki promptu keşfet. Midjourney, DALL·E, Flux, Stable Diffusion ve daha fazlasından kürate edilmiş binlerce prompt — kopyala, remixle, kendi versiyonunu üret.";
+
+/** Default OG image (used on every page unless explicitly overridden). */
+export const DEFAULT_OG_IMAGE = {
+  url: "/logos/og-default-1200x630.png",
+  width: 1200,
+  height: 630,
+  alt: SITE_NAME,
+} as const;
+
+export const DEFAULT_TWITTER_IMAGE = "/logos/og-twitter-1200x675.png";
 
 /** Build an absolute URL from a path. */
 export function absoluteUrl(path: string): string {

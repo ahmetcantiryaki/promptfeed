@@ -11,7 +11,7 @@ import { listFolderSummaries } from "@/lib/folders";
 import { createClient } from "@/lib/supabase/server";
 import { isAdmin as checkIsAdmin } from "@/lib/admin";
 import { prettyModel, prettyPlatform } from "@/lib/labels";
-import { absoluteUrl } from "@/lib/site";
+import { DEFAULT_OG_IMAGE, DEFAULT_TWITTER_IMAGE } from "@/lib/site";
 import { InteractionsProvider } from "@/components/providers/interactions-provider";
 import { SaveFolderModalsHost } from "@/components/features/save-folders/save-folder-modals-host";
 import { BannedScreen } from "@/components/features/banned/banned-screen";
@@ -56,28 +56,27 @@ export async function generateMetadata({
   const model = prettyModel(post.model_slug);
   const title = `${handle} on ${platform} — ${model} prompt`;
   const description = post.prompt.replace(/\s+/g, " ").trim().slice(0, 200);
-  const ogImage = post.media_url
-    ? [{ url: absoluteUrl(post.media_url), alt: description }]
-    : undefined;
 
   return {
     title,
     description,
     alternates: { canonical },
+    // Not indexable in search engines (paylaşma akışını engellememek için
+    // robots.txt /prompt/ allow → OG botları yine fetch edebilir).
     robots: { index: false, follow: false },
     openGraph: {
       type: "article",
       title,
       description,
       url: canonical,
-      images: ogImage,
+      images: [DEFAULT_OG_IMAGE],
       publishedTime: post.posted_at,
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ogImage?.map((i) => i.url),
+      images: [DEFAULT_TWITTER_IMAGE],
     },
   };
 }

@@ -13,7 +13,11 @@ import {
   listSavedPostsInFolder,
 } from "@/lib/folders";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { canonicalQuery } from "@/lib/site";
+import {
+  canonicalQuery,
+  DEFAULT_OG_IMAGE,
+  DEFAULT_TWITTER_IMAGE,
+} from "@/lib/site";
 import { prettyModel, prettyPlatform } from "@/lib/labels";
 import type {
   Post,
@@ -70,8 +74,19 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical },
-    openGraph: { title, description, url: canonical, type: "website" },
-    twitter: { title, description, card: "summary_large_image" },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      type: "website",
+      images: [DEFAULT_OG_IMAGE],
+    },
+    twitter: {
+      title,
+      description,
+      card: "summary_large_image",
+      images: [DEFAULT_TWITTER_IMAGE],
+    },
   };
 }
 
