@@ -1,16 +1,16 @@
-# PromptFeed
+# Feedlens.ai
 
 > AI ile üretilmiş görsellerin arkasındaki promptları keşfet ve kopyala. Twitter/X, Instagram, Reddit, YouTube ve TikTok'taki AI içeriklerini, onları üreten promptlarla yan yana sunan bir keşif platformu.
 
-PromptFeed, sosyal medyada öne çıkan Midjourney, DALL·E, Flux, Stable Diffusion, Sora ve diğer modellerle üretilmiş görselleri kürate eder. Her postta görselin yanında onu üreten prompt (gerektiğinde JSON formatında) tek tıkla kopyalanabilir, klasörlerde organize edilebilir ve remix referansı olarak kullanılabilir.
+Feedlens.ai, sosyal medyada öne çıkan Midjourney, DALL·E, Flux, Stable Diffusion, Sora ve diğer modellerle üretilmiş görselleri kürate eder. Her postta görselin yanında onu üreten prompt (gerektiğinde JSON formatında) tek tıkla kopyalanabilir, klasörlerde organize edilebilir ve remix referansı olarak kullanılabilir.
 
 Hedef kullanıcılar: AI sanatçıları, prompt mühendisleri, içerik üreticileri ve görsel araştırması yapan tasarımcılar.
 
 ## Public sayfalar
-- [Discover feed](https://promptfeed.app/): En güncel ve trend AI promptları içeren ana akış. Model ve platform bazlı filtrelenebilir.
-- [Trending prompts](https://promptfeed.app/?sort=top): En çok beğenilen promptlar.
-- [Filter by model](https://promptfeed.app/?model=midjourney): Belirli bir AI modeline göre filtrelenmiş feed (`?model=<slug>`).
-- [Filter by platform](https://promptfeed.app/?platform=x): Belirli bir sosyal platformun içerikleri (`?platform=<slug>`).
+- [Discover feed](https://feedlens.ai/): En güncel ve trend AI promptları içeren ana akış. Model ve platform bazlı filtrelenebilir.
+- [Trending prompts](https://feedlens.ai/?sort=top): En çok beğenilen promptlar.
+- [Filter by model](https://feedlens.ai/?model=midjourney): Belirli bir AI modeline göre filtrelenmiş feed (`?model=<slug>`).
+- [Filter by platform](https://feedlens.ai/?platform=x): Belirli bir sosyal platformun içerikleri (`?platform=<slug>`).
 
 ## Veri yapısı
 Her prompt aşağıdaki bilgileri içerir:

@@ -153,7 +153,7 @@ export function UserMenu({
               </div>
               <div className="min-w-0">
                 <Dialog.Title className="text-[16px] font-semibold text-text">
-                  Sign out of PromptFeed?
+                  Sign out of Feedlens.ai?
                 </Dialog.Title>
                 <Dialog.Description
                   id="signout-desc"

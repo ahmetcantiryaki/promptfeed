@@ -11,14 +11,58 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/browser";
 import { createFolder, moveSaveToFolder } from "@/lib/folders-client";
 import { SignInModal } from "@/components/features/auth/sign-in-modal";
-import type { SaveFolder } from "@/types/domain";
+import type { Post, SaveFolder } from "@/types/domain";
+
+interface ApiResult {
+  success: boolean;
+  error: string | null;
+}
+
+async function postJson(url: string, body: unknown): Promise<void> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 429) {
+    throw new Error("Too fast — slow down and try again in a moment.");
+  }
+  let payload: ApiResult | null = null;
+  try {
+    payload = (await res.json()) as ApiResult;
+  } catch {
+    // ignore parse error
+  }
+  if (!res.ok || !payload?.success) {
+    throw new Error(payload?.error ?? "request_failed");
+  }
+}
+
+const LAST_FOLDER_STORAGE_KEY = "pf:last-folder-id";
+
+function readLastFolderId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(LAST_FOLDER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeLastFolderId(folderId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LAST_FOLDER_STORAGE_KEY, folderId);
+  } catch {
+    // ignore
+  }
+}
 
 type PendingAuthAction =
   | { kind: "like"; postId: string }
-  | { kind: "save"; postId: string };
+  | { kind: "save"; post: Post };
 
 interface InteractionsState {
   isAuthed: boolean;
@@ -32,13 +76,18 @@ interface InteractionsState {
   saveByPostId: ReadonlyMap<string, string>;
   pendingSavePostId: string | null;
   pickerPostId: string | null;
+  saveDialogPost: Post | null;
+  lastFolderId: string | null;
   toggleLike: (postId: string) => Promise<void>;
-  toggleSave: (postId: string) => Promise<void>;
+  toggleSave: (post: Post) => Promise<void>;
+  requestSave: (post: Post) => void;
+  closeSaveDialog: () => void;
   openPickerForPost: (postId: string) => void;
   closePicker: () => void;
   cancelPendingSave: () => void;
   createFirstFolderAndSave: (name: string) => Promise<void>;
   addFolder: (name: string, makeDefault: boolean) => Promise<SaveFolder>;
+  saveToFolder: (postId: string, folderId: string) => Promise<void>;
   movePostToFolder: (postId: string, folderId: string) => Promise<void>;
   setDefaultFolderClient: (folderId: string) => void;
   removeFolderFromState: (folderId: string) => void;
@@ -78,7 +127,18 @@ export function InteractionsProvider({
     null,
   );
   const [pickerPostId, setPickerPostId] = useState<string | null>(null);
+  const [saveDialogPost, setSaveDialogPost] = useState<Post | null>(null);
+  const [lastFolderId, setLastFolderIdState] = useState<string | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
+
+  useEffect(() => {
+    setLastFolderIdState(readLastFolderId());
+  }, []);
+
+  const rememberFolder = useCallback((folderId: string) => {
+    writeLastFolderId(folderId);
+    setLastFolderIdState(folderId);
+  }, []);
   const [pendingAuthAction, setPendingAuthAction] =
     useState<PendingAuthAction | null>(null);
 
@@ -100,20 +160,10 @@ export function InteractionsProvider({
       else next.add(postId);
       setLiked(next);
       try {
-        const supabase = createClient();
-        if (wasLiked) {
-          const { error } = await supabase
-            .from("post_likes")
-            .delete()
-            .eq("post_id", postId)
-            .eq("user_id", userId);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from("post_likes")
-            .insert({ post_id: postId, user_id: userId });
-          if (error) throw error;
-        }
+        await postJson("/api/likes", {
+          postId,
+          action: wasLiked ? "unlike" : "like",
+        });
       } catch (e) {
         setLiked(new Set(liked));
         toast.error(e instanceof Error ? e.message : "Could not save like");
@@ -134,11 +184,11 @@ export function InteractionsProvider({
       setSaved(nextSaved);
       setSaveByPostId(nextMap);
       try {
-        const supabase = createClient();
-        const { error } = await supabase
-          .from("post_saves")
-          .insert({ post_id: postId, user_id: userId, folder_id: folderId });
-        if (error) throw error;
+        await postJson("/api/saves", {
+          action: "save",
+          postId,
+          folderId,
+        });
         toast.success(`Saved to ${folderName}`, {
           duration: 4500,
           action: {
@@ -167,13 +217,7 @@ export function InteractionsProvider({
       setSaved(nextSaved);
       setSaveByPostId(nextMap);
       try {
-        const supabase = createClient();
-        const { error } = await supabase
-          .from("post_saves")
-          .delete()
-          .eq("post_id", postId)
-          .eq("user_id", userId);
-        if (error) throw error;
+        await postJson("/api/saves", { action: "unsave", postId });
         toast("Removed from saved");
       } catch (e) {
         setSaved(prevSaved);
@@ -184,25 +228,52 @@ export function InteractionsProvider({
     [saved, saveByPostId, userId],
   );
 
-  const toggleSave = useCallback(
-    async (postId: string) => {
+  const requestSave = useCallback(
+    (post: Post) => {
       if (!userId) {
-        setPendingAuthAction({ kind: "save", postId });
+        setPendingAuthAction({ kind: "save", post });
         setSignInOpen(true);
         return;
       }
-      if (saved.has(postId)) {
-        await removeSave(postId);
+      if (saved.has(post.id)) return;
+      if (folders.length === 0) {
+        setPendingSavePostId(post.id);
         return;
       }
-      const target = folders.find((f) => f.is_default) ?? folders[0] ?? null;
-      if (!target) {
-        setPendingSavePostId(postId);
-        return;
-      }
-      await insertSave(postId, target.id, target.name);
+      setSaveDialogPost(post);
     },
-    [userId, saved, folders, insertSave, removeSave],
+    [userId, saved, folders],
+  );
+
+  const closeSaveDialog = useCallback(() => {
+    setSaveDialogPost(null);
+  }, []);
+
+  const saveToFolder = useCallback(
+    async (postId: string, folderId: string) => {
+      if (!userId) return;
+      const folder = folders.find((f) => f.id === folderId);
+      if (!folder) return;
+      rememberFolder(folderId);
+      await insertSave(postId, folderId, folder.name);
+    },
+    [userId, folders, insertSave, rememberFolder],
+  );
+
+  const toggleSave = useCallback(
+    async (post: Post) => {
+      if (!userId) {
+        setPendingAuthAction({ kind: "save", post });
+        setSignInOpen(true);
+        return;
+      }
+      if (saved.has(post.id)) {
+        await removeSave(post.id);
+        return;
+      }
+      requestSave(post);
+    },
+    [userId, saved, removeSave, requestSave],
   );
 
   const cancelPendingSave = useCallback(() => {
@@ -229,7 +300,7 @@ export function InteractionsProvider({
     if (action.kind === "like") {
       void toggleLikeRef.current(action.postId);
     } else {
-      void toggleSaveRef.current(action.postId);
+      void toggleSaveRef.current(action.post);
     }
   }, [userId, pendingAuthAction]);
 
@@ -268,9 +339,10 @@ export function InteractionsProvider({
       const created = await addFolder(name, true);
       const postId = pendingSavePostId;
       setPendingSavePostId(null);
+      rememberFolder(created.id);
       await insertSave(postId, created.id, created.name);
     },
-    [userId, pendingSavePostId, addFolder, insertSave],
+    [userId, pendingSavePostId, addFolder, insertSave, rememberFolder],
   );
 
   const movePostToFolder = useCallback(
@@ -342,13 +414,18 @@ export function InteractionsProvider({
       saveByPostId,
       pendingSavePostId,
       pickerPostId,
+      saveDialogPost,
+      lastFolderId,
       toggleLike,
       toggleSave,
+      requestSave,
+      closeSaveDialog,
       openPickerForPost,
       closePicker,
       cancelPendingSave,
       createFirstFolderAndSave,
       addFolder,
+      saveToFolder,
       movePostToFolder,
       setDefaultFolderClient,
       removeFolderFromState,
@@ -365,13 +442,18 @@ export function InteractionsProvider({
       saveByPostId,
       pendingSavePostId,
       pickerPostId,
+      saveDialogPost,
+      lastFolderId,
       toggleLike,
       toggleSave,
+      requestSave,
+      closeSaveDialog,
       openPickerForPost,
       closePicker,
       cancelPendingSave,
       createFirstFolderAndSave,
       addFolder,
+      saveToFolder,
       movePostToFolder,
       setDefaultFolderClient,
       removeFolderFromState,
@@ -408,8 +490,12 @@ export function useInteractions(): InteractionsState {
       saveByPostId: new Map(),
       pendingSavePostId: null,
       pickerPostId: null,
+      saveDialogPost: null,
+      lastFolderId: null,
       toggleLike: noopAsync,
       toggleSave: noopAsync,
+      requestSave: () => {},
+      closeSaveDialog: () => {},
       openPickerForPost: () => {},
       closePicker: () => {},
       cancelPendingSave: () => {},
@@ -417,6 +503,7 @@ export function useInteractions(): InteractionsState {
       addFolder: async () => {
         throw new Error("Sign in required.");
       },
+      saveToFolder: noopAsync,
       movePostToFolder: noopAsync,
       setDefaultFolderClient: () => {},
       removeFolderFromState: () => {},

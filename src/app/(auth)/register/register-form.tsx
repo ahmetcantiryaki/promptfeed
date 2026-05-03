@@ -44,7 +44,7 @@ export function RegisterForm() {
         setError(signInError.message);
         return;
       }
-      toast.success("Welcome to PromptFeed");
+      toast.success("Welcome to Feedlens.ai");
       router.push("/");
       router.refresh();
     } finally {

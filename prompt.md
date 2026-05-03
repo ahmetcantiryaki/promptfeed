@@ -1,4 +1,4 @@
-# PromptFeed — AI İçerik Keşif Platformu
+# Feedlens.ai — AI İçerik Keşif Platformu
 
 ## Proje
 Sosyal medyada (Twitter, Reddit, Instagram, YouTube, TikTok) paylaşılan 

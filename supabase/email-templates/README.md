@@ -1,4 +1,4 @@
-# PromptFeed email templates
+# Feedlens.ai email templates
 
 Drop-in templates for the Supabase Auth email types. Light + dark mode
 aware, mobile-friendly, no remote assets, fewer than 50KB.
@@ -7,8 +7,8 @@ aware, mobile-friendly, no remote assets, fewer than 50KB.
 
 | File | Supabase template | Subject |
 |---|---|---|
-| `confirm-signup.html` | Confirm signup | `Confirm your PromptFeed account` |
-| `reset-password.html` | Reset password | `Reset your PromptFeed password` |
+| `confirm-signup.html` | Confirm signup | `Confirm your Feedlens.ai account` |
+| `reset-password.html` | Reset password | `Reset your Feedlens.ai password` |
 
 ## How to install
 

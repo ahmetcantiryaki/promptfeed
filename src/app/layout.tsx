@@ -11,13 +11,13 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 const DEFAULT_TITLE =
-  "PromptFeed — AI görsel promptlarını keşfet, kopyala, remixle";
+  "Feedlens.ai — AI görsel promptlarını keşfet, kopyala, remixle";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: DEFAULT_TITLE,
-    template: "%s — PromptFeed",
+    template: "%s — Feedlens.ai",
   },
   description: DEFAULT_DESCRIPTION,
   applicationName: SITE_NAME,

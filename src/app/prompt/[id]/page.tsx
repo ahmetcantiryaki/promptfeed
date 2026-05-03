@@ -134,7 +134,7 @@ export default async function PromptPage({ params }: PageProps) {
             href="/"
             className="text-[14px] font-semibold tracking-tight text-text"
           >
-            PromptFeed
+            Feedlens.ai
           </Link>
         </header>
 

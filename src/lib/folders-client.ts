@@ -76,15 +76,26 @@ export async function deleteFolder(folderId: string): Promise<void> {
 }
 
 export async function moveSaveToFolder(
-  userId: string,
+  _userId: string,
   postId: string,
   folderId: string,
 ): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("post_saves")
-    .update({ folder_id: folderId })
-    .eq("user_id", userId)
-    .eq("post_id", postId);
-  if (error) throw error;
+  const res = await fetch("/api/saves", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "move", postId, folderId }),
+  });
+  if (res.status === 429) {
+    throw new Error("Too fast — slow down and try again in a moment.");
+  }
+  if (!res.ok) {
+    let msg = "request_failed";
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j.error) msg = j.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(msg);
+  }
 }

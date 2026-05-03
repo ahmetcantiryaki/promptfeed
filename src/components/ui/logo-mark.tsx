@@ -9,7 +9,7 @@ export function LogoMark({ height = 36, className }: LogoMarkProps) {
   const width = Math.round(height * LOGO_RATIO);
   return (
     <span
-      aria-label="PromptFeed"
+      aria-label="Feedlens.ai"
       role="img"
       className={className}
       style={{ display: "inline-flex", lineHeight: 0, width, height }}

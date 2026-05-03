@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import {
   Heart,
   Bookmark,
@@ -34,8 +34,14 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
   const isLiked = liked.has(post.id);
   const isSaved = saved.has(post.id);
 
-  const likeCount = post.likes + (isLiked ? 1 : 0);
-  const saveCount = post.shares + (isSaved ? 1 : 0);
+  // post.likes/shares already include the user's interaction (DB trigger),
+  // so adjust the display only by the delta from the initial server state.
+  const initialLikedRef = useRef(isLiked);
+  const initialSavedRef = useRef(isSaved);
+  const likeCount =
+    post.likes + (isLiked ? 1 : 0) - (initialLikedRef.current ? 1 : 0);
+  const saveCount =
+    post.shares + (isSaved ? 1 : 0) - (initialSavedRef.current ? 1 : 0);
   const isRemix = post.prompt_type === "remix" && Boolean(post.source_image_url);
   const hasExtras = !isRemix && (post.extra_image_urls?.length ?? 0) > 0;
 
@@ -181,7 +187,7 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
             <ToggleStat
               active={isSaved}
               activeClass="bg-text text-bg hover:bg-text"
-              onClick={() => toggleSave(post.id)}
+              onClick={() => toggleSave(post)}
               icon={
                 <Bookmark
                   className="h-4 w-4"
@@ -280,7 +286,7 @@ function EditorFooter({
   const xUrl = owner.xUrl ?? fallbackXUrl;
   const inner = (
     <>
-      <span className="text-text-subtle">Editor</span>
+      <span className="text-text-subtle">Curator</span>
       <span className="font-semibold text-text">{handle}</span>
       {xUrl ? (
         <ExternalLink

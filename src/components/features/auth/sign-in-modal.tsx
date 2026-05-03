@@ -37,7 +37,7 @@ export function SignInModal({ open, onClose, onSignedIn }: Props) {
           aria-describedby={undefined}
           className="fixed left-1/2 top-1/2 z-[210] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[14px] border bg-surface shadow-2xl outline-none"
         >
-          <Dialog.Title className="sr-only">Sign in to PromptFeed</Dialog.Title>
+          <Dialog.Title className="sr-only">Sign in to Feedlens.ai</Dialog.Title>
           <Header view={view} onBack={() => setView("signin")} onClose={onClose} />
 
           {view === "signin" ? (
@@ -232,7 +232,7 @@ function RegisterView({
         setError(signInError.message);
         return;
       }
-      toast.success("Welcome to PromptFeed");
+      toast.success("Welcome to Feedlens.ai");
       onSignedIn();
       router.refresh();
     } finally {

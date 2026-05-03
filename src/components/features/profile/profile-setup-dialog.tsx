@@ -42,7 +42,7 @@ export function ProfileSetupDialog({
               </div>
               <div>
                 <Dialog.Title className="text-[17px] font-semibold tracking-tight">
-                  Welcome to PromptFeed
+                  Welcome to Feedlens.ai
                 </Dialog.Title>
                 <p
                   id="profile-setup-desc"

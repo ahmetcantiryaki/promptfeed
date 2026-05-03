@@ -121,7 +121,7 @@ export function ProfileEditor({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `promptfeed-avatar-${handle || user.id.slice(0, 8)}.png`;
+      a.download = `feedlens-avatar-${handle || user.id.slice(0, 8)}.png`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {

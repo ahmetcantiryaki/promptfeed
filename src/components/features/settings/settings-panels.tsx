@@ -34,7 +34,7 @@ export function AccountPanel({
       <header>
         <h3 className="text-[15px] font-semibold text-text">Profile</h3>
         <p className="mt-0.5 text-[12px] text-text-muted">
-          How other PromptFeed members see you.
+          How other Feedlens.ai members see you.
         </p>
       </header>
 

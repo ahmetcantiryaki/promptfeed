@@ -1,4 +1,4 @@
-# PromptFeed Migrations
+# Feedlens.ai Migrations
 
 These migrations harden an **existing** Supabase project. They are
 idempotent (use `IF NOT EXISTS`, `DROP POLICY IF EXISTS`, etc.) so they

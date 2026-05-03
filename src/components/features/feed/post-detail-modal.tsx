@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   X,
@@ -38,8 +38,25 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
   const isLiked = post ? liked.has(post.id) : false;
   const isSaved = post ? saved.has(post.id) : false;
 
-  const likeCount = (post?.likes ?? 0) + (isLiked ? 1 : 0);
-  const saveCount = (post?.shares ?? 0) + (isSaved ? 1 : 0);
+  // post.likes/shares already include the user's interaction (DB trigger),
+  // so adjust the display only by the delta from the initial server state.
+  // Reset the snapshot whenever the modal switches to a different post.
+  const snapshotRef = useRef<{
+    id: string | null;
+    liked: boolean;
+    saved: boolean;
+  }>({ id: null, liked: false, saved: false });
+  if (post && snapshotRef.current.id !== post.id) {
+    snapshotRef.current = { id: post.id, liked: isLiked, saved: isSaved };
+  }
+  const likeCount =
+    (post?.likes ?? 0) +
+    (isLiked ? 1 : 0) -
+    (snapshotRef.current.liked ? 1 : 0);
+  const saveCount =
+    (post?.shares ?? 0) +
+    (isSaved ? 1 : 0) -
+    (snapshotRef.current.saved ? 1 : 0);
 
   const parsedJson = useMemo(
     () => (post ? tryParseJson(post.prompt) : null),
@@ -202,7 +219,7 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
                     <ToggleStat
                       active={isSaved}
                       activeClass="bg-text text-bg hover:bg-text"
-                      onClick={() => toggleSave(post.id)}
+                      onClick={() => toggleSave(post)}
                       icon={
                         <Bookmark
                           className="h-4 w-4"
@@ -317,7 +334,7 @@ function EditorFooter({ owner }: { owner: OwnerInfo | null }) {
   const xUrl = owner.xUrl;
   const inner = (
     <>
-      <span className="text-text-subtle">Editor</span>
+      <span className="text-text-subtle">Curator</span>
       <span className="font-semibold text-text">{handle}</span>
       {xUrl ? (
         <ExternalLink

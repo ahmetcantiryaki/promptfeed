@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Heart,
   Bookmark,
@@ -37,8 +37,14 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
   const isLiked = liked.has(post.id);
   const isSaved = saved.has(post.id);
 
-  const likeCount = post.likes + (isLiked ? 1 : 0);
-  const saveCount = post.shares + (isSaved ? 1 : 0);
+  // post.likes/shares already include the user's interaction (DB trigger),
+  // so adjust the display only by the delta from the initial server state.
+  const initialLikedRef = useRef(isLiked);
+  const initialSavedRef = useRef(isSaved);
+  const likeCount =
+    post.likes + (isLiked ? 1 : 0) - (initialLikedRef.current ? 1 : 0);
+  const saveCount =
+    post.shares + (isSaved ? 1 : 0) - (initialSavedRef.current ? 1 : 0);
 
   const isRemix =
     post.prompt_type === "remix" && Boolean(post.source_image_url);
@@ -139,7 +145,7 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
               label={isSaved ? "Unsave" : "Save"}
               active={isSaved}
               activeClass="bg-white text-black hover:bg-white"
-              onClick={() => toggleSave(post.id)}
+              onClick={() => toggleSave(post)}
               icon={
                 <Bookmark
                   className="h-4 w-4"

@@ -14,7 +14,7 @@ export default function NotFound() {
       <div className="flex w-full max-w-[440px] flex-col items-center text-center">
         <Link
           href="/"
-          aria-label="PromptFeed"
+          aria-label="Feedlens.ai"
           className="mb-8 inline-flex items-center justify-center"
         >
           <LogoMark height={32} />

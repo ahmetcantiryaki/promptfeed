@@ -27,7 +27,7 @@ export function BannedScreen() {
               id="banned-desc"
               className="text-[13px] leading-[1.55] text-text-muted"
             >
-              PromptFeed üzerinde herhangi bir işlem gerçekleştiremezsin. Bu
+              Feedlens.ai üzerinde herhangi bir işlem gerçekleştiremezsin. Bu
               karar topluluk kurallarımıza dayanmaktadır.
             </p>
           </div>
@@ -42,7 +42,7 @@ export function BannedScreen() {
 
           <a
             href={`mailto:${APPEAL_EMAIL}?subject=${encodeURIComponent(
-              "PromptFeed — Ban itirazı",
+              "Feedlens.ai — Ban itirazı",
             )}`}
             className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-accent bg-accent px-4 py-2.5 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90"
           >

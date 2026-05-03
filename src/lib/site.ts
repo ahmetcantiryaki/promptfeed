@@ -1,6 +1,6 @@
 /**
  * Canonical site origin used for absolute URLs in metadata, sitemaps, and robots.
- * Set NEXT_PUBLIC_SITE_URL in production (e.g. "https://promptfeed.app").
+ * Set NEXT_PUBLIC_SITE_URL in production (e.g. "https://feedlens.ai").
  */
 export const SITE_URL: string = (() => {
   const raw =
@@ -12,7 +12,7 @@ export const SITE_URL: string = (() => {
   return raw.replace(/\/+$/, "");
 })();
 
-export const SITE_NAME = "PromptFeed";
+export const SITE_NAME = "Feedlens.ai";
 export const DEFAULT_DESCRIPTION =
   "Sosyal medyadaki AI görsellerin promptlarını tek akışta keşfet. Midjourney, DALL·E, Flux ve daha fazlasından kürate edilmiş binlerce prompt — kopyala, remixle.";
 

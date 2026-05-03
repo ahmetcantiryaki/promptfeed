@@ -1,6 +1,6 @@
 {
-  "name": "PromptFeed",
-  "short_name": "PromptFeed",
+  "name": "Feedlens.ai",
+  "short_name": "Feedlens",
   "description": "Discover and share AI prompts.",
   "start_url": "/",
   "display": "standalone",
