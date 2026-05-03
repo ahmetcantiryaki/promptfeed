@@ -20,6 +20,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { LogoMark } from "@/components/ui/logo-mark";
 import type {
   ProfileRow,
   ProfileWithEmail,
@@ -148,13 +149,12 @@ interface SidebarProps {
 function AdminSidebar({ section, onSectionChange, counts }: SidebarProps) {
   return (
     <aside className="sticky top-0 flex h-screen w-[248px] shrink-0 flex-col gap-4 overflow-hidden border-r bg-surface px-3 py-4">
-      <Link href="/" className="flex items-center gap-2.5 px-2 py-0.5">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent text-[16px] font-bold text-accent-fg">
-          F
-        </span>
-        <span className="text-[16px] font-semibold tracking-tight">
-          Feedlens.ai
-        </span>
+      <Link
+        href="/"
+        aria-label="Feedlens.ai"
+        className="flex items-center justify-center px-2 py-0.5"
+      >
+        <LogoMark height={27} width={126} />
       </Link>
 
       <div className="flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-label">

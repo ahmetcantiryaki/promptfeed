@@ -81,8 +81,12 @@ export function Sidebar({
 
   return (
     <aside className="sticky top-0 flex h-screen w-[248px] shrink-0 flex-col gap-4 overflow-hidden border-r bg-surface px-3 py-4">
-      <Link href="/" aria-label="Feedlens.ai" className="flex items-center px-2 py-0.5">
-        <LogoMark height={28} className="shrink-0" />
+      <Link
+        href="/"
+        aria-label="Feedlens.ai"
+        className="flex items-center justify-center px-2 py-0.5"
+      >
+        <LogoMark height={27} width={126} className="shrink-0" />
       </Link>
 
       <nav className="flex flex-col gap-0.5">
