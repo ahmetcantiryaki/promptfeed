@@ -406,11 +406,7 @@ export function AddPromptDialog({
     icon: <ModelBadge slug={m.slug} size={20} />,
     meta: `${formatCount(m.post_count)} posts`,
   }));
-  const hasOther = platforms.some((p) => p.slug === "other");
-  const platformList = hasOther
-    ? platforms
-    : [...platforms, { slug: "other", name: "Other / Web", post_count: 0 } as Platform];
-  const platformOptions: SelectOption<string>[] = platformList.map((p) => ({
+  const platformOptions: SelectOption<string>[] = platforms.map((p) => ({
     value: p.slug,
     label: p.name,
     icon: isPlatformSlug(p.slug) ? (
@@ -583,7 +579,7 @@ export function AddPromptDialog({
                       {sourceDisplayLabel(parsedCreator)}
                     </span>
                     {parsedCreator.handle === null &&
-                    parsedCreator.platform !== "other" ? (
+                    parsedCreator.platform !== "web" ? (
                       <span className="text-text-subtle">
                         · no handle in URL — will link to source
                       </span>

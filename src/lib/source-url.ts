@@ -31,7 +31,7 @@ export function parseSourceUrl(raw: string): ParsedSource | null {
   if (u.protocol !== "http:" && u.protocol !== "https:") return null;
   const hostname = u.hostname.replace(/^www\./i, "").toLowerCase();
   const platform =
-    HOST_PATTERNS.find(([rx]) => rx.test(hostname))?.[1] ?? "other";
+    HOST_PATTERNS.find(([rx]) => rx.test(hostname))?.[1] ?? "web";
   const handle = extractHandle(platform, u);
   return { platform, handle, url: u.toString(), hostname };
 }
@@ -88,6 +88,6 @@ function extractHandle(platform: PlatformSlug, u: URL): string | null {
 
 export function sourceDisplayLabel(parsed: ParsedSource): string {
   if (parsed.handle) return parsed.handle;
-  if (parsed.platform === "other") return parsed.hostname;
+  if (parsed.platform === "web") return parsed.hostname;
   return PLATFORM_THEME[parsed.platform].label;
 }

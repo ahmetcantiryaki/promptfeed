@@ -7,7 +7,7 @@ export type PlatformSlug =
   | "instagram"
   | "youtube"
   | "tiktok"
-  | "other";
+  | "web";
 
 export type Post = Database["public"]["Tables"]["posts"]["Row"];
 export type Model = Database["public"]["Tables"]["models"]["Row"];

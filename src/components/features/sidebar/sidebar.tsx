@@ -14,7 +14,7 @@ import {
 } from "@/components/providers/feed-filter-provider";
 
 function OtherBadge({ size = 20 }: { size?: number }) {
-  return <PlatformBadge platform="other" size={size} />;
+  return <PlatformBadge platform="web" size={size} />;
 }
 
 export type SidebarRoute = "discover" | "saved" | null;
@@ -264,19 +264,7 @@ function PlatformsList({
   isHomePath: boolean;
   onPick: (slug: string) => void;
 }) {
-  const hasOther = platforms.some((p) => p.slug === "other");
-  const list: Platform[] = hasOther
-    ? platforms
-    : [
-        ...platforms,
-        {
-          slug: "other",
-          name: "Web",
-          post_count: 0,
-          created_at: new Date(0).toISOString(),
-          icon_url: null,
-        },
-      ];
+  const list: Platform[] = platforms;
   return (
     <div className="flex flex-col gap-0.5">
       <div className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-label">
