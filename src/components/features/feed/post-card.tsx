@@ -13,6 +13,7 @@ import type { Post } from "@/types/domain";
 import type { OwnerInfo } from "@/lib/posts";
 import { cn, formatCount } from "@/lib/utils";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
+import { LazyImage } from "@/components/ui/lazy-image";
 import { prettyModel } from "@/lib/labels";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { PostCardMenu } from "./post-card-menu";
@@ -75,12 +76,10 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
       ) : hasExtras ? (
         <AutoSlider images={allImages} alt={post.prompt.slice(0, 80)} />
       ) : (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
+        <LazyImage
           src={post.thumbnail_url ?? post.media_url}
           alt={post.prompt.slice(0, 80)}
-          loading="lazy"
-          className="block h-auto w-full transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+          imgClassName="transition-transform duration-500 ease-out group-hover:scale-[1.04]"
         />
       )}
 
@@ -191,13 +190,11 @@ function AutoSlider({ images, alt }: { images: string[]; alt: string }) {
       onPointerLeave={() => setHover(false)}
     >
       {/* Base image — drives the card height */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={first}
+      <LazyImage
+        src={first ?? ""}
         alt={alt}
-        loading="lazy"
-        className={cn(
-          "block h-auto w-full transition-all duration-700 ease-out group-hover:scale-[1.04]",
+        imgClassName={cn(
+          "transition-all duration-700 ease-out group-hover:scale-[1.04]",
           images.length > 1 && idx !== 0 && "opacity-0",
         )}
       />

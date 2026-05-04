@@ -222,7 +222,7 @@ function MeasuredCard({ post, owner, onOpen, onMeasure }: MeasuredCardProps) {
   }, [post.id, onMeasure]);
 
   return (
-    <div ref={wrapRef}>
+    <div ref={wrapRef} className="pf-card-in">
       <PostCard post={post} owner={owner} onOpen={onOpen} />
     </div>
   );
