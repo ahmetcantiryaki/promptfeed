@@ -14,7 +14,7 @@ export const SITE_URL: string = (() => {
 
 export const SITE_NAME = "Feedlens.ai";
 export const DEFAULT_DESCRIPTION =
-  "Discover the prompts behind the AI images you see on social — curated from GPT Image, Midjourney, Nano Banana, and more. Copy, remix, share.";
+  "Discover the prompts behind the AI images you see on social — curated from GPT Image, Midjourney, Nano Banana, Flux, Sora, and more. Copy, remix, share.";
 
 /** Default OG image (used on every page unless explicitly overridden). */
 export const DEFAULT_OG_IMAGE = {

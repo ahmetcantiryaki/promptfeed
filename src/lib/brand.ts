@@ -22,7 +22,11 @@ export const MODEL_BRAND: Record<string, BrandVisual> = {
     borderColor: "#fcd34d",
   },
   midjourney: { letter: "M", bg: "var(--surface-2)", fg: "var(--text)" },
-  "dalle-3": { letter: "D", bg: "var(--surface-2)", fg: "var(--text)" },
+  "midjourney-v8-1": { letter: "M", bg: "var(--surface-2)", fg: "var(--text)" },
+  "flux-pro": { letter: "F", bg: "var(--surface-2)", fg: "var(--text)" },
+  "flux-1-1": { letter: "F", bg: "var(--surface-2)", fg: "var(--text)" },
+  "sora-2": { letter: "S", bg: "#000000", fg: "#ffffff" },
+  "veo-3": { letter: "V", bg: "var(--surface-2)", fg: "var(--text)" },
   kling: { letter: "K", bg: "var(--surface-2)", fg: "var(--text)" },
   seedance: { letter: "S", bg: "var(--surface-2)", fg: "var(--text)" },
 };

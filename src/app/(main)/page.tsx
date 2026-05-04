@@ -76,7 +76,7 @@ export async function generateMetadata({
   const description =
     segments.length > 0
       ? `Discover, copy, and remix prompts behind AI images made with ${segments.join(", ")}. A curated archive of the best examples from social media.`
-      : "Discover prompts behind AI images from social media in one feed. Thousands of curated prompts from Midjourney, DALL·E, Flux, and more — copy and remix.";
+      : "Discover prompts behind AI images from social media in one feed. Thousands of curated prompts from GPT Image, Midjourney, Nano Banana, Flux, Sora, and more — copy and remix.";
   return {
     title,
     description,

@@ -43,15 +43,15 @@ export const MODEL_BRAND: Record<string, ModelBrand> = {
     path: OPENAI_PATH,
     letter: "G",
   },
-  "dalle-3": {
-    label: "DALL·E 3",
+  sora: {
+    label: "Sora",
     bg: "#000000",
     fg: "#ffffff",
     path: OPENAI_PATH,
-    letter: "D",
+    letter: "S",
   },
-  sora: {
-    label: "Sora",
+  "sora-2": {
+    label: "Sora 2",
     bg: "#000000",
     fg: "#ffffff",
     path: OPENAI_PATH,

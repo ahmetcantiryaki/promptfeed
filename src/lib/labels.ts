@@ -14,7 +14,10 @@ const MODEL_LABELS: Record<string, string> = {
   "nano-banana-2": "Nano Banana 2",
   midjourney: "Midjourney",
   "midjourney-v8-1": "Midjourney v8.1",
-  "dalle-3": "DALL·E 3",
+  "flux-pro": "Flux Pro",
+  "flux-1-1": "Flux 1.1",
+  "sora-2": "Sora 2",
+  "veo-3": "Veo 3",
   kling: "Kling",
   seedance: "Seedance",
 };
