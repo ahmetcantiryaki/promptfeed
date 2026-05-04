@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   X,
@@ -11,6 +11,7 @@ import {
   Wand2,
   Share2,
   Braces,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Post } from "@/types/domain";
@@ -22,6 +23,7 @@ import { prettyModel, prettyPlatform } from "@/lib/labels";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { tryParseJson, prettifyJson } from "@/lib/prompt-format";
 import { safeHref } from "@/lib/safe-url";
+import { trackPostView } from "@/lib/track-view";
 import { RemixCurtain } from "./remix-curtain";
 import { DetailImageSlider } from "./detail-image-slider";
 
@@ -62,6 +64,19 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
     [post],
   );
   const isJson = parsedJson !== null;
+
+  // Fire view-tracking exactly once per (post, open) transition.
+  const lastTrackedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open || !post) return;
+    if (lastTrackedRef.current === post.id) return;
+    lastTrackedRef.current = post.id;
+    trackPostView(post.id);
+  }, [open, post]);
+
+  const viewCount = post
+    ? (post as Post & { views?: number | null }).views ?? 0
+    : 0;
 
   async function copyPrompt() {
     if (!post) return;
@@ -227,6 +242,13 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
                         />
                       }
                       count={saveCount}
+                    />
+                    <StaticStat
+                      icon={
+                        <BarChart3 className="h-4 w-4" strokeWidth={2} />
+                      }
+                      count={viewCount}
+                      label="Views"
                     />
                     <button
                       type="button"
@@ -405,5 +427,25 @@ function ToggleStat({
       {icon}
       <span>{formatCount(count)}</span>
     </button>
+  );
+}
+
+function StaticStat({
+  icon,
+  count,
+  label,
+}: {
+  icon: React.ReactNode;
+  count: number;
+  label: string;
+}) {
+  return (
+    <span
+      aria-label={`${label}: ${count}`}
+      className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-[12px] font-semibold tabular-nums text-text-muted"
+    >
+      {icon}
+      <span>{formatCount(count)}</span>
+    </span>
   );
 }

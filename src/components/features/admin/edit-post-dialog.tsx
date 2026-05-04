@@ -218,15 +218,15 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
   async function save() {
     setError(null);
     if (prompt.trim().length < 6) {
-      setError("Prompt en az 6 karakter olmalı.");
+      setError("Prompt must be at least 6 characters.");
       return;
     }
     if (!userId) {
-      setError("Görsel yüklemek için giriş yapmış olmalısın.");
+      setError("You need to be signed in to upload images.");
       return;
     }
     if (!main.preview) {
-      setError("Ana görsel boş olamaz.");
+      setError("Main image can't be empty.");
       return;
     }
 
@@ -292,12 +292,12 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
       patch.extra_image_urls = newExtras;
 
       await updatePost(post.id, patch);
-      toast.success("Prompt güncellendi");
+      toast.success("Prompt updated");
       onSaved?.();
       onOpenChange(false);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Güncelleme başarısız");
+      setError(e instanceof Error ? e.message : "Update failed");
     } finally {
       setSaving(false);
     }
@@ -313,7 +313,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
         >
           <div className="flex items-center justify-between border-b px-5 py-3.5">
             <Dialog.Title className="text-[15px] font-semibold tracking-tight text-text">
-              Promptu düzenle
+              Edit prompt
             </Dialog.Title>
             <Dialog.Close asChild>
               <button
@@ -330,7 +330,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
             {/* Images section */}
             <section className="flex flex-col gap-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
-                Görseller
+                Images
               </div>
               <div
                 className={cn(
@@ -339,7 +339,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
                 )}
               >
                 <ImageEditorCard
-                  label={isRemix ? "Output (sonuç)" : "Ana görsel"}
+                  label={isRemix ? "Output" : "Main image"}
                   preview={main.preview}
                   externalUrl={main.externalUrl}
                   hasFile={Boolean(main.file)}
@@ -348,7 +348,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
                 />
                 {isRemix ? (
                   <ImageEditorCard
-                    label="Input (kaynak)"
+                    label="Input (source)"
                     badge={<Wand2 className="h-3 w-3" strokeWidth={2} />}
                     preview={source.preview}
                     externalUrl={source.externalUrl}
@@ -363,7 +363,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] font-medium text-text-muted">
-                      Ekstra görseller{" "}
+                      Extra images{" "}
                       <span className="text-text-subtle">
                         ({extras.length}/{EXTRA_LIMIT})
                       </span>
@@ -375,13 +375,13 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
                         className="inline-flex items-center gap-1 rounded-[8px] border bg-surface px-2.5 py-1 text-[12px] font-medium text-text-muted hover:bg-hover hover:text-text"
                       >
                         <Plus className="h-3 w-3" strokeWidth={2} />
-                        Ekle
+                        Add
                       </button>
                     ) : null}
                   </div>
                   {extras.length === 0 ? (
                     <p className="text-[12px] text-text-subtle">
-                      Bu prompt için ekstra görsel yok.
+                      No extra images for this prompt.
                     </p>
                   ) : (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -448,7 +448,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
               </Field>
             </div>
 
-            <Field label="Original creator handle (opsiyonel)">
+            <Field label="Original creator handle (optional)">
               <input
                 value={extHandle}
                 onChange={(e) => setExtHandle(e.target.value)}
@@ -489,7 +489,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
                 type="button"
                 className="rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted hover:bg-hover hover:text-text"
               >
-                Vazgeç
+                Cancel
               </button>
             </Dialog.Close>
             <button
@@ -501,7 +501,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
               {saving ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : null}
-              Kaydet
+              Save
             </button>
           </div>
         </Dialog.Content>
@@ -577,7 +577,7 @@ function ImageEditorCard({
           />
         ) : (
           <div className="grid h-full w-full place-items-center text-[11px] text-text-subtle">
-            Görsel yok
+            No image
           </div>
         )}
       </div>
@@ -588,13 +588,13 @@ function ImageEditorCard({
           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border bg-surface px-2.5 py-1.5 text-[12px] font-medium text-text-muted hover:bg-hover hover:text-text"
         >
           <Upload className="h-3 w-3" strokeWidth={2} />
-          {preview ? "Değiştir" : "Yükle"}
+          {preview ? "Replace" : "Upload"}
         </button>
         {onRemove ? (
           <button
             type="button"
             onClick={onRemove}
-            aria-label="Kaldır"
+            aria-label="Remove"
             className="grid h-7 w-7 place-items-center rounded-[8px] border bg-surface text-text-muted hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-500"
           >
             <Trash2 className="h-3 w-3" strokeWidth={2} />
@@ -606,7 +606,7 @@ function ImageEditorCard({
           "flex items-center gap-1.5 rounded-[8px] border bg-surface px-2 py-1 transition-colors focus-within:border-border-strong",
           hasFile && "opacity-50",
         )}
-        title={hasFile ? "Yüklenen dosyayı kaldır, sonra URL yapıştır" : undefined}
+        title={hasFile ? "Remove the uploaded file before pasting a URL" : undefined}
       >
         <LinkIcon
           className="h-3 w-3 shrink-0 text-text-subtle"
@@ -617,7 +617,7 @@ function ImageEditorCard({
           value={externalUrl}
           onChange={(e) => onUrlChange(e.target.value)}
           disabled={hasFile}
-          placeholder="…veya görsel URL'si yapıştır"
+          placeholder="…or paste an image URL"
           className="min-w-0 flex-1 bg-transparent text-[11px] text-text placeholder:text-text-subtle focus:outline-none disabled:cursor-not-allowed"
         />
       </div>

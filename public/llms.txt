@@ -1,32 +1,32 @@
 # Feedlens.ai
 
-> AI ile üretilmiş görsellerin arkasındaki promptları keşfet ve kopyala. Twitter/X, Instagram, Reddit, YouTube ve TikTok'taki AI içeriklerini, onları üreten promptlarla yan yana sunan bir keşif platformu.
+> Discover and copy the prompts behind AI-generated images. Feedlens.ai is a discovery platform that pairs AI content from Twitter/X, Instagram, Reddit, YouTube, and TikTok with the prompts that produced it.
 
-Feedlens.ai, sosyal medyada öne çıkan Midjourney, DALL·E, Flux, Stable Diffusion, Sora ve diğer modellerle üretilmiş görselleri kürate eder. Her postta görselin yanında onu üreten prompt (gerektiğinde JSON formatında) tek tıkla kopyalanabilir, klasörlerde organize edilebilir ve remix referansı olarak kullanılabilir.
+Feedlens.ai curates AI images created with the models actually present on the platform — currently GPT Image, GPT Image 2, Midjourney v8.1, Nano Banana 2, and Nano Banana Pro. For each post, the prompt sits next to the image (in JSON when relevant), copyable in one click, organizable into folders, and ready to use as a remix reference.
 
-Hedef kullanıcılar: AI sanatçıları, prompt mühendisleri, içerik üreticileri ve görsel araştırması yapan tasarımcılar.
+Audience: AI artists, prompt engineers, content creators, and designers doing visual research.
 
-## Public sayfalar
-- [Discover feed](https://feedlens.ai/): En güncel ve trend AI promptları içeren ana akış. Model ve platform bazlı filtrelenebilir.
-- [Trending prompts](https://feedlens.ai/?sort=top): En çok beğenilen promptlar.
-- [Filter by model](https://feedlens.ai/?model=midjourney): Belirli bir AI modeline göre filtrelenmiş feed (`?model=<slug>`).
-- [Filter by platform](https://feedlens.ai/?platform=x): Belirli bir sosyal platformun içerikleri (`?platform=<slug>`).
+## Public pages
+- [Discover feed](https://feedlens.ai/): Main stream of the freshest and trending AI prompts. Filterable by model and platform.
+- [Trending prompts](https://feedlens.ai/?sort=top): The most-liked prompts.
+- [Filter by model](https://feedlens.ai/?model=midjourney): Feed filtered to a specific AI model (`?model=<slug>`).
+- [Filter by platform](https://feedlens.ai/?platform=x): Feed filtered to a specific source platform (`?platform=<slug>`).
 
-## Veri yapısı
-Her prompt aşağıdaki bilgileri içerir:
-- Görsel (single image, multi-image carousel veya remix input/output)
-- Prompt metni (düz metin veya JSON)
-- Üretim modeli (örn. Midjourney v7, Flux Dev, Sora)
-- Orijinal kaynak platform ve yaratıcı handle
-- Kaynak URL (orijinal post bağlantısı)
-- Yayın tarihi, beğeni ve kaydetme istatistikleri
-- Prompt tipi: standard veya remix (image-to-image)
+## Data structure
+Every prompt includes:
+- Image (single, multi-image carousel, or remix input/output)
+- Prompt text (plain text or JSON)
+- Generation model (e.g. Midjourney v8.1, Nano Banana Pro, GPT Image 2)
+- Original source platform and creator handle
+- Source URL (link to the original post)
+- Posted timestamp, like and save counts
+- Prompt type: standard or remix (image-to-image)
 
-## Erişim ve kısıtlar
-- Anasayfa ve filtre kombinasyonları indekslenebilir.
-- Bireysel prompt detay sayfaları (`/prompt/<id>`) `noindex` olarak işaretlidir; arama motoru sonuçlarında çıkmaz ancak link paylaşımında OpenGraph önizlemesi çalışır.
-- Kullanıcı profilleri, kayıt klasörleri (`/?view=saved`), admin paneli ve auth sayfaları crawl edilmez (`robots.txt` `disallow`).
-- API endpointleri (`/api/posts`, `/api/saved`, `/api/report`) rate-limit'lidir, otomatik scraping önerilmez.
+## Access and limits
+- The home feed and filter combinations are indexable.
+- Individual prompt detail pages (`/prompt/<id>`) are marked `noindex`; they don't show up in search results, but OpenGraph previews work when shared.
+- User profiles, saved-folder views (`/?view=saved`), the admin panel, and auth pages are not crawled (`robots.txt` `disallow`).
+- API endpoints (`/api/posts`, `/api/saved`, `/api/report`) are rate-limited; automated scraping is discouraged.
 
-## İletişim
-- İtiraz, telif veya iş birliği: ahmetcan.1855@gmail.com
+## Contact
+- Appeals, copyright, or partnerships: ahmetcan.1855@gmail.com

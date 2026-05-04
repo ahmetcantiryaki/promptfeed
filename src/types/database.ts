@@ -208,6 +208,7 @@ export type Database = {
           source_url: string
           source_user: string
           thumbnail_url: string | null
+          views: number
         }
         Insert: {
           comments?: number
@@ -232,6 +233,7 @@ export type Database = {
           source_url: string
           source_user: string
           thumbnail_url?: string | null
+          views?: number
         }
         Update: {
           comments?: number
@@ -256,6 +258,7 @@ export type Database = {
           source_url?: string
           source_user?: string
           thumbnail_url?: string | null
+          views?: number
         }
         Relationships: [
           {
@@ -424,6 +427,10 @@ export type Database = {
           name: string
           user_id: string
         }
+      }
+      increment_post_views: {
+        Args: { p_post_id: string }
+        Returns: undefined
       }
       is_admin: { Args: { uid: string }; Returns: boolean }
       set_default_save_folder: {

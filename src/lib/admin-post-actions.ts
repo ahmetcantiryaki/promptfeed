@@ -66,11 +66,11 @@ export async function deletePostWithToast(
 ): Promise<boolean> {
   try {
     await deletePostById(id);
-    toast.success("Prompt silindi");
+    toast.success("Prompt deleted");
     onDone?.();
     return true;
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : "Silme başarısız");
+    toast.error(e instanceof Error ? e.message : "Delete failed");
     return false;
   }
 }

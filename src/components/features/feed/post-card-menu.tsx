@@ -131,7 +131,7 @@ export function PostCardMenu({ post, tone = "light" }: Props) {
                 <Item
                   onSelect={() => {
                     if (!isAuthed) {
-                      toast("Önce giriş yapmalısın.", {
+                      toast("You need to sign in first.", {
                         action: {
                           label: "Sign in",
                           onClick: () => {
@@ -166,10 +166,10 @@ export function PostCardMenu({ post, tone = "light" }: Props) {
         <ConfirmDialog
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
-          title="Bu promptu silmek istiyor musun?"
-          description="Prompt ve ona bağlı görsel/like/save kayıtları kalıcı olarak silinir. Bu işlem geri alınamaz."
-          confirmLabel="Sil"
-          cancelLabel="Vazgeç"
+          title="Delete this prompt?"
+          description="The prompt and all its images, likes, and saves are permanently removed. This can't be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
           tone="danger"
           icon={<Trash2 className="h-5 w-5" strokeWidth={2} />}
           onConfirm={onDelete}

@@ -21,28 +21,28 @@ export function BannedScreen() {
               id="banned-title"
               className="text-[18px] font-semibold tracking-tight text-text"
             >
-              Hesabın askıya alındı
+              Your account is suspended
             </h1>
             <p
               id="banned-desc"
               className="text-[13px] leading-[1.55] text-text-muted"
             >
-              Feedlens.ai üzerinde herhangi bir işlem gerçekleştiremezsin. Bu
-              karar topluluk kurallarımıza dayanmaktadır.
+              You can&apos;t perform any actions on Feedlens.ai. This decision
+              was made under our community guidelines.
             </p>
           </div>
         </div>
 
         <div className="flex flex-col gap-4 px-6 py-6">
           <div className="rounded-[12px] border bg-surface-2/40 px-4 py-3.5 text-[13px] leading-[1.6] text-text-muted">
-            Yasaklamanın kaldırılmasını talep etmek istiyorsan, aşağıdaki
-            e-posta adresine durumunu açıklayan bir mesaj gönder. Başvuruları
-            elle inceliyoruz, mümkün olan en kısa sürede dönüş yapılır.
+            If you&apos;d like to appeal the ban, send us an email at the
+            address below explaining your case. Each appeal is reviewed by
+            hand — we&apos;ll get back to you as soon as we can.
           </div>
 
           <a
             href={`mailto:${APPEAL_EMAIL}?subject=${encodeURIComponent(
-              "Feedlens.ai — Ban itirazı",
+              "Feedlens.ai — Ban appeal",
             )}`}
             className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-accent bg-accent px-4 py-2.5 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90"
           >
@@ -56,7 +56,7 @@ export function BannedScreen() {
               className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] border bg-surface px-4 py-2 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
             >
               <LogOut className="h-3.5 w-3.5" strokeWidth={1.8} />
-              Oturumu kapat
+              Sign out
             </button>
           </form>
         </div>

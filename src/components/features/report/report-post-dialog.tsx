@@ -21,39 +21,39 @@ interface ReasonOption {
 const REASONS: ReasonOption[] = [
   {
     value: "spam",
-    label: "Spam veya yanıltıcı",
-    description: "Tekrar eden, alakasız ya da reklam içeriği.",
+    label: "Spam or misleading",
+    description: "Repetitive, off-topic, or promotional content.",
   },
   {
     value: "inappropriate",
-    label: "Uygunsuz içerik",
-    description: "Şiddet, yetişkinlere yönelik ya da rahatsız edici görsel.",
+    label: "Inappropriate content",
+    description: "Violent, adult, or otherwise disturbing imagery.",
   },
   {
     value: "copyright",
-    label: "Telif hakkı",
-    description: "İzinsiz kullanılmış bir görsel ya da prompt.",
+    label: "Copyright",
+    description: "An image or prompt used without permission.",
   },
   {
     value: "harassment",
-    label: "Taciz veya nefret",
-    description: "Kişilere ya da gruplara yönelik saldırgan içerik.",
+    label: "Harassment or hate",
+    description: "Content that attacks a person or group.",
   },
   {
     value: "other",
-    label: "Diğer",
-    description: "Aşağıda kısaca açıkla.",
+    label: "Other",
+    description: "Tell us more below.",
   },
 ];
 
 const ERROR_MESSAGES: Record<string, string> = {
-  unauthenticated: "Önce giriş yapmalısın.",
-  banned: "Hesabın askıya alınmış, işlem yapamazsın.",
-  reason_too_short: "Lütfen daha fazla detay ekle.",
-  already_reported: "Bu prompt için zaten bir bildirim gönderdin.",
+  unauthenticated: "You need to sign in first.",
+  banned: "Your account is suspended — you can't take this action.",
+  reason_too_short: "Please add a bit more detail.",
+  already_reported: "You've already reported this prompt.",
   rate_limited:
-    "Son 24 saatte çok fazla bildirim gönderdin. Daha sonra tekrar dene.",
-  post_not_found: "Bu prompt artık mevcut değil.",
+    "You've sent too many reports in the last 24 hours. Try again later.",
+  post_not_found: "This prompt no longer exists.",
 };
 
 export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
@@ -85,14 +85,14 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
       if (!res.ok || !json.success) {
         const msg =
           ERROR_MESSAGES[json.error as string] ??
-          "Bildirim gönderilemedi, sonra tekrar dene.";
+          "Couldn't send your report. Please try again.";
         toast.error(msg);
         return;
       }
-      toast.success("Bildirim alındı, ekip inceleyecek.");
+      toast.success("Report received — our team will take a look.");
       onOpenChange(false);
     } catch {
-      toast.error("Bağlantı hatası, sonra tekrar dene.");
+      toast.error("Connection error. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -113,21 +113,21 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
               </div>
               <div>
                 <Dialog.Title className="text-[15px] font-semibold tracking-tight">
-                  Bu promptu bildir
+                  Report this prompt
                 </Dialog.Title>
                 <p
                   id="report-desc"
                   className="mt-0.5 text-[12px] text-text-muted"
                 >
-                  Bildirim ekibe iletilir. Aynı prompt için tek bildirim
-                  gönderebilirsin.
+                  Your report goes to our team. You can only report each prompt
+                  once.
                 </p>
               </div>
             </div>
             <Dialog.Close asChild>
               <button
                 type="button"
-                aria-label="Kapat"
+                aria-label="Close"
                 className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted transition-colors hover:bg-hover hover:text-text"
               >
                 <X className="h-4 w-4" strokeWidth={1.8} />
@@ -138,7 +138,7 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
           <div className="flex flex-col gap-4 overflow-y-auto px-5 py-4">
             <fieldset className="flex flex-col gap-1.5">
               <legend className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
-                Sebep
+                Reason
               </legend>
               <div className="flex flex-col gap-1">
                 {REASONS.map((opt) => {
@@ -177,13 +177,13 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
 
             <label className="flex flex-col gap-1.5">
               <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
-                Detay <span className="text-text-subtle normal-case">(opsiyonel, 500 karaktere kadar)</span>
+                Details <span className="text-text-subtle normal-case">(optional, up to 500 characters)</span>
               </span>
               <textarea
                 value={details}
                 onChange={(e) => setDetails(e.target.value.slice(0, 500))}
                 rows={4}
-                placeholder="Ekipler için kısa bir açıklama yaz…"
+                placeholder="A short note for the review team…"
                 className="resize-y rounded-[10px] border bg-surface-2 px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
               />
               <span className="self-end text-[10px] tabular-nums text-text-subtle">
@@ -198,7 +198,7 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
                 type="button"
                 className="rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted hover:bg-hover hover:text-text"
               >
-                Vazgeç
+                Cancel
               </button>
             </Dialog.Close>
             <button
@@ -212,7 +212,7 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
               ) : (
                 <Flag className="h-3.5 w-3.5" strokeWidth={2} />
               )}
-              Bildir
+              Report
             </button>
           </div>
         </Dialog.Content>

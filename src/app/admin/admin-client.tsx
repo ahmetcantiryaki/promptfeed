@@ -327,10 +327,10 @@ function PromptsPanel({
           <div className="flex max-w-[360px] flex-col items-center gap-3 px-6">
             <ImageIcon className="h-6 w-6 text-text-subtle" strokeWidth={1.6} />
             <div className="text-[15px] font-semibold text-text">
-              Henüz prompt yok
+              No prompts yet
             </div>
             <p className="text-[13px] text-text-muted">
-              İlk promptu ekleyerek başla.
+              Add the first one to kick things off.
             </p>
             <div className="mt-1">{addButton}</div>
           </div>
@@ -352,7 +352,7 @@ function PromptsPanel({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Prompt, kullanıcı, model, platform ara…"
+              placeholder="Search prompts, users, models, platforms…"
               className="min-w-0 flex-1 bg-transparent text-[13px] text-text placeholder:text-text-subtle focus:outline-none"
             />
           </label>
@@ -483,10 +483,10 @@ function PromptsPanel({
         onOpenChange={(o) => {
           if (!o) setDeleting(null);
         }}
-        title="Bu promptu silmek istiyor musun?"
-        description="Prompt ve ona bağlı görsel/like/save kayıtları kalıcı olarak silinir. Bu işlem geri alınamaz."
-        confirmLabel="Sil"
-        cancelLabel="Vazgeç"
+        title="Delete this prompt?"
+        description="The prompt and all its images, likes, and saves are permanently removed. This can't be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
         tone="danger"
         icon={<Trash2 className="h-5 w-5" strokeWidth={2} />}
         onConfirm={async () => {

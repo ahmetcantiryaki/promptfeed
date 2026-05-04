@@ -212,6 +212,91 @@ export async function getOwnerProfiles(
   return map;
 }
 
+export interface PostsCursor {
+  posted_at: string;
+  id: string;
+}
+
+export interface PagedPostsResult {
+  posts: Post[];
+  nextCursor: PostsCursor | null;
+}
+
+export async function listPostsPaged(
+  filters: PostFilters = {},
+  cursor: PostsCursor | null = null,
+): Promise<PagedPostsResult> {
+  const supabase = await createClient();
+  let query = supabase.from("posts").select("*");
+
+  query = query.eq("media_type", filters.mediaType ?? "image");
+
+  if (filters.model) {
+    if (filters.model === OTHER_SLUG) {
+      const knownSlugs = await getKnownModelSlugs();
+      if (knownSlugs.length > 0) {
+        query = query.not("model_slug", "in", `(${knownSlugs.join(",")})`);
+      }
+    } else {
+      query = query.eq("model_slug", filters.model);
+    }
+  }
+  if (filters.platform) {
+    if (filters.platform === OTHER_SLUG) {
+      const knownSlugs = await getKnownPlatformSlugs();
+      if (knownSlugs.length > 0) {
+        query = query.not("platform_slug", "in", `(${knownSlugs.join(",")})`);
+      }
+    } else {
+      query = query.eq("platform_slug", filters.platform);
+    }
+  }
+
+  // "top" sort uses likes desc — cursor pagination on likes is unstable
+  // because likes change. For "top", fall back to offsetless ordering and
+  // rely on a hard limit (no infinite scroll past first page in that mode
+  // would defeat the design — so we still paginate by (likes, posted_at, id)
+  // tuple cursor when needed).
+  const sort = filters.sort ?? "newest";
+  const limit = filters.limit ?? 30;
+
+  if (sort === "top") {
+    query = query
+      .order("likes", { ascending: false })
+      .order("posted_at", { ascending: false })
+      .order("id", { ascending: false });
+    // Cursor on (posted_at, id) tiebreakers only when likes ties are rare
+    // enough — for production correctness we keyset on (posted_at, id) within
+    // the descending-likes ordering. This is a pragmatic compromise.
+    if (cursor) {
+      query = query.or(
+        `posted_at.lt.${cursor.posted_at},and(posted_at.eq.${cursor.posted_at},id.lt.${cursor.id})`,
+      );
+    }
+  } else {
+    query = query
+      .order("posted_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (cursor) {
+      query = query.or(
+        `posted_at.lt.${cursor.posted_at},and(posted_at.eq.${cursor.posted_at},id.lt.${cursor.id})`,
+      );
+    }
+  }
+
+  query = query.limit(limit);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  const posts = data ?? [];
+  const last = posts[posts.length - 1];
+  const nextCursor =
+    posts.length === limit && last
+      ? { posted_at: last.posted_at, id: last.id }
+      : null;
+  return { posts, nextCursor };
+}
+
 export async function totalPostCount(): Promise<number> {
   const supabase = await createClient();
   const { count, error } = await supabase

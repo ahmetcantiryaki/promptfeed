@@ -3,8 +3,9 @@ import { HomeContent } from "@/components/features/feed/home-content";
 import {
   getOwnerProfiles,
   listModelsAndPlatforms,
-  listPosts,
+  listPostsPaged,
   type OwnerMap,
+  type PostsCursor,
 } from "@/lib/posts";
 import {
   getFolderById,
@@ -38,6 +39,11 @@ function parseSort(raw?: string): PostSort {
   return raw === "top" ? "top" : "newest";
 }
 
+function encodeCursor(cursor: PostsCursor | null): string | null {
+  if (!cursor) return null;
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64");
+}
+
 const HOME_CANONICAL_PARAMS = ["model", "platform", "sort"] as const;
 
 export async function generateMetadata({
@@ -64,12 +70,12 @@ export async function generateMetadata({
   if (params.sort === "top") segments.push("Trend");
   const title =
     segments.length > 0
-      ? `${segments.join(" · ")} promptları — örnek görsellerle keşfet`
-      : "AI görsel promptlarını keşfet, kopyala, remixle";
+      ? `${segments.join(" · ")} prompts — discover example images`
+      : "Discover, copy, and remix AI image prompts";
   const description =
     segments.length > 0
-      ? `${segments.join(", ")} ile üretilmiş AI görsellerin promptlarını keşfet, kopyala ve remixle. Sosyal medyadaki en iyi örneklerden kürate edilmiş arşiv.`
-      : "Sosyal medyadaki AI görsellerin promptlarını tek akışta keşfet. Midjourney, DALL·E, Flux ve daha fazlasından kürate edilmiş binlerce prompt — kopyala, remixle.";
+      ? `Discover, copy, and remix prompts behind AI images made with ${segments.join(", ")}. A curated archive of the best examples from social media.`
+      : "Discover prompts behind AI images from social media in one feed. Thousands of curated prompts from Midjourney, DALL·E, Flux, and more — copy and remix.";
   return {
     title,
     description,
@@ -102,7 +108,11 @@ export default async function Home({
   const user = await getCurrentUser();
   const { models, platforms } = await listModelsAndPlatforms();
 
-  let initialFeed: { posts: Post[]; owners: OwnerMap } | null = null;
+  let initialFeed: {
+    posts: Post[];
+    owners: OwnerMap;
+    nextCursor: string | null;
+  } | null = null;
   let initialFolders: SaveFolderSummary[] | null = null;
   let initialFolderDetail:
     | { folder: SaveFolder; posts: Post[]; owners: OwnerMap }
@@ -127,18 +137,22 @@ export default async function Home({
       initialFolders = await listFolderSummaries(user.id, data);
     }
   } else if (!isSavedView) {
-    const posts = await listPosts({
+    const { posts, nextCursor } = await listPostsPaged({
       model: params.model,
       platform: params.platform,
       mediaType: "image",
       sort: parseSort(params.sort),
-      limit: 60,
+      limit: 30,
     });
     const ownerIds = posts
       .map((p) => p.owner_id)
       .filter((id): id is string => Boolean(id));
     const owners = await getOwnerProfiles(ownerIds);
-    initialFeed = { posts, owners };
+    initialFeed = {
+      posts,
+      owners,
+      nextCursor: encodeCursor(nextCursor),
+    };
   }
 
   return (

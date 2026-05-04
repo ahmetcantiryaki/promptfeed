@@ -11,7 +11,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 const DEFAULT_TITLE =
-  "Feedlens.ai — AI görsel promptlarını keşfet, kopyala, remixle";
+  "Feedlens.ai — Discover, copy, and remix AI image prompts";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     title: DEFAULT_TITLE,
     description: DEFAULT_DESCRIPTION,
     url: SITE_URL,
-    locale: "tr_TR",
+    locale: "en_US",
     images: [
       {
         url: "/logos/og-default-1200x630.png",
@@ -72,7 +72,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="tr" suppressHydrationWarning className={jetbrainsMono.variable}>
+    <html lang="en" suppressHydrationWarning className={jetbrainsMono.variable}>
       <head>
         <script
           // Prevent flash of incorrect theme before React mounts.

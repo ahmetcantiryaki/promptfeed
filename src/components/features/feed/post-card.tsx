@@ -7,6 +7,7 @@ import {
   Wand2,
   Images,
   ExternalLink,
+  BarChart3,
 } from "lucide-react";
 import type { Post } from "@/types/domain";
 import type { OwnerInfo } from "@/lib/posts";
@@ -46,6 +47,7 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
     post.likes + (isLiked ? 1 : 0) - (initialLikedRef.current ? 1 : 0);
   const saveCount =
     post.shares + (isSaved ? 1 : 0) - (initialSavedRef.current ? 1 : 0);
+  const viewCount = (post as Post & { views?: number | null }).views ?? 0;
 
   const isRemix =
     post.prompt_type === "remix" && Boolean(post.source_image_url);
@@ -157,6 +159,7 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
             >
               {formatCount(saveCount)}
             </ActionBtn>
+            <ViewChip count={viewCount} />
             <SourceBtn url={externalSourceUrl(post)} />
             <PostCardMenu post={post} tone="dark" />
           </div>
@@ -237,6 +240,18 @@ interface ActionBtnProps {
   active: boolean;
   activeClass: string;
   onClick: () => void;
+}
+
+function ViewChip({ count }: { count: number }) {
+  return (
+    <span
+      aria-label={`Views: ${count}`}
+      className="inline-flex h-8 items-center gap-1 rounded-full bg-black/55 px-2.5 text-[11px] font-semibold tabular-nums text-white backdrop-blur-md"
+    >
+      <BarChart3 className="h-4 w-4" strokeWidth={2} />
+      {formatCount(count)}
+    </span>
+  );
 }
 
 function SourceBtn({ url }: { url: string | null }) {

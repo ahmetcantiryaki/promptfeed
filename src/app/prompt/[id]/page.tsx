@@ -61,8 +61,8 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical },
-    // Not indexable in search engines (paylaşma akışını engellememek için
-    // robots.txt /prompt/ allow → OG botları yine fetch edebilir).
+    // Not indexable in search engines, but robots.txt allows /prompt/ so OG
+    // unfurl bots (Twitter, Slack, etc.) can still fetch the page for previews.
     robots: { index: false, follow: false },
     openGraph: {
       type: "article",

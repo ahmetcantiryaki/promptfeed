@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Bookmark, Folder } from "lucide-react";
 import type {
   Model,
@@ -20,6 +20,7 @@ import { useRouteProgress } from "@/components/providers/route-progress-provider
 interface InitialFeed {
   posts: Post[];
   owners: OwnerMap;
+  nextCursor?: string | null;
 }
 
 interface InitialFolderDetail {
@@ -39,7 +40,10 @@ interface Props {
 interface FeedData {
   posts: Post[];
   owners: OwnerMap;
+  nextCursor: string | null;
 }
+
+const PAGE_SIZE = 30;
 
 export function HomeContent({
   models,
@@ -54,12 +58,22 @@ export function HomeContent({
   const progressRef = useRef(progress);
   progressRef.current = progress;
 
-  const [feed, setFeed] = useState<FeedData | null>(initialFeed);
+  const [feed, setFeed] = useState<FeedData | null>(
+    initialFeed
+      ? {
+          posts: initialFeed.posts,
+          owners: initialFeed.owners,
+          nextCursor: initialFeed.nextCursor ?? null,
+        }
+      : null,
+  );
   const [folders, setFolders] = useState<SaveFolderSummary[] | null>(
     initialFolders,
   );
   const [folderDetail, setFolderDetail] =
     useState<InitialFolderDetail | null>(initialFolderDetail);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreInFlight = useRef(false);
   const requestId = useRef(0);
 
   // Fetch on filter changes (skip first render — server already provided initial data)
@@ -109,6 +123,7 @@ export function HomeContent({
           if (state.model) params.set("model", state.model);
           if (state.platform) params.set("platform", state.platform);
           if (state.sort === "top") params.set("sort", "top");
+          params.set("limit", String(PAGE_SIZE));
           const res = await fetch(`/api/posts?${params.toString()}`, {
             signal: ac.signal,
             cache: "no-store",
@@ -116,7 +131,11 @@ export function HomeContent({
           const json = await res.json();
           if (id !== requestId.current) return;
           if (json.success) {
-            setFeed(json.data);
+            setFeed({
+              posts: json.data.posts,
+              owners: json.data.owners,
+              nextCursor: json.data.nextCursor ?? null,
+            });
             setFolders(null);
             setFolderDetail(null);
           }
@@ -133,6 +152,41 @@ export function HomeContent({
       progressRef.current.done();
     };
   }, [state.view, state.model, state.platform, state.sort, state.folder]);
+
+  const loadMore = useCallback(async () => {
+    if (loadMoreInFlight.current) return;
+    if (!feed || !feed.nextCursor) return;
+    loadMoreInFlight.current = true;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ type: "image" });
+      if (state.model) params.set("model", state.model);
+      if (state.platform) params.set("platform", state.platform);
+      if (state.sort === "top") params.set("sort", "top");
+      params.set("limit", String(PAGE_SIZE));
+      params.set("cursor", feed.nextCursor);
+      const res = await fetch(`/api/posts?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (json.success) {
+        const seen = new Set(feed.posts.map((p) => p.id));
+        const incoming = (json.data.posts as Post[]).filter(
+          (p) => !seen.has(p.id),
+        );
+        setFeed({
+          posts: [...feed.posts, ...incoming],
+          owners: { ...feed.owners, ...(json.data.owners as OwnerMap) },
+          nextCursor: json.data.nextCursor ?? null,
+        });
+      }
+    } catch {
+      // swallow — infinite scroll failures shouldn't disrupt the page
+    } finally {
+      loadMoreInFlight.current = false;
+      setLoadingMore(false);
+    }
+  }, [feed, state.model, state.platform, state.sort]);
 
   return (
     <>
@@ -153,6 +207,8 @@ export function HomeContent({
           feed={feed}
           folders={folders}
           folderDetail={folderDetail}
+          onLoadMore={loadMore}
+          loadingMore={loadingMore}
         />
       </div>
     </>
@@ -165,6 +221,8 @@ interface BodyProps {
   feed: FeedData | null;
   folders: SaveFolderSummary[] | null;
   folderDetail: InitialFolderDetail | null;
+  onLoadMore: () => void;
+  loadingMore: boolean;
 }
 
 function ContentBody({
@@ -173,6 +231,8 @@ function ContentBody({
   feed,
   folders,
   folderDetail,
+  onLoadMore,
+  loadingMore,
 }: BodyProps) {
   if (state.view === "saved") {
     if (!isAuthed) {
@@ -217,7 +277,15 @@ function ContentBody({
     return <SavedFoldersGrid folders={folders} />;
   }
 
-  return <FeedGrid posts={feed?.posts ?? []} ownerMap={feed?.owners ?? {}} />;
+  return (
+    <FeedGrid
+      posts={feed?.posts ?? []}
+      ownerMap={feed?.owners ?? {}}
+      onLoadMore={onLoadMore}
+      hasMore={Boolean(feed?.nextCursor)}
+      loadingMore={loadingMore}
+    />
+  );
 }
 
 function SavedHeader({
