@@ -118,7 +118,7 @@ export function SavedFoldersGrid({ folders: initialFolders }: Props) {
               onClick={() => setFilter({ view: "saved", folder: f.id })}
               className="block w-full overflow-hidden rounded-[14px] border bg-surface-2 text-left transition-all hover:border-border-strong"
             >
-              <CoverCollage urls={f.cover_urls} />
+              <CoverCollage urls={f.cover_urls} hasPosts={f.post_count > 0} />
               <div className="flex items-start justify-between gap-2 px-3 py-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -232,9 +232,18 @@ export function SavedFoldersGrid({ folders: initialFolders }: Props) {
   );
 }
 
-function CoverCollage({ urls }: { urls: string[] }) {
+function CoverCollage({
+  urls,
+  hasPosts,
+}: {
+  urls: string[];
+  hasPosts: boolean;
+}) {
   if (urls.length === 0) {
-    return <CoverEmpty />;
+    // hasPosts but no covers yet → cover URLs are still loading from the API.
+    // Show a quiet skeleton instead of the broken-image fallback so the
+    // shimmer disappears as soon as real thumbnails arrive.
+    return hasPosts ? <CoverSkeleton /> : <CoverEmpty />;
   }
   if (urls.length === 1) {
     return (
@@ -268,6 +277,12 @@ function CoverCollage({ urls }: { urls: string[] }) {
         <CoverImg key={i} src={u} />
       ))}
     </div>
+  );
+}
+
+function CoverSkeleton() {
+  return (
+    <div className="aspect-square animate-pulse bg-gradient-to-br from-surface to-surface-2" />
   );
 }
 

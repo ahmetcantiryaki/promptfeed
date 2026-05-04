@@ -117,9 +117,16 @@ export function HomeContent({
 
     // Instant paint for the saved-folders list: render counts/names from
     // the in-memory provider data while we wait for the API to return cover
-    // thumbnails. No-op if user is on a specific folder.
+    // thumbnails. No-op if user is on a specific folder, and don't clobber
+    // an already-populated cover list — synthetic has empty cover_urls and
+    // would flash a broken placeholder over working thumbnails on re-entry.
     if (state.view === "saved" && !state.folder) {
-      setFolders(syntheticFolders);
+      setFolders((current) => {
+        if (current && current.some((f) => f.cover_urls.length > 0)) {
+          return current;
+        }
+        return syntheticFolders;
+      });
     }
 
     (async () => {
