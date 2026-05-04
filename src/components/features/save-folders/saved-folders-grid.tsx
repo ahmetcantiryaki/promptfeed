@@ -234,77 +234,72 @@ export function SavedFoldersGrid({ folders: initialFolders }: Props) {
 
 function CoverCollage({ urls }: { urls: string[] }) {
   if (urls.length === 0) {
-    return (
-      <div className="grid aspect-square place-items-center bg-surface text-text-subtle">
-        <ImageOff className="h-6 w-6" strokeWidth={1.6} />
-      </div>
-    );
+    return <CoverEmpty />;
   }
   if (urls.length === 1) {
     return (
-      <div className="aspect-square overflow-hidden bg-black">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={urls[0]}
-          alt=""
-          className="h-full w-full object-cover"
-          loading="lazy"
-        />
+      <div className="aspect-square overflow-hidden bg-surface">
+        <CoverImg src={urls[0]!} spanRow={false} />
       </div>
     );
   }
   if (urls.length === 2) {
     return (
-      <div className="grid aspect-square grid-cols-2 gap-[2px] bg-black">
+      <div className="grid aspect-square grid-cols-2 gap-[2px] bg-surface">
         {urls.slice(0, 2).map((u, i) => (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            key={i}
-            src={u}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
+          <CoverImg key={i} src={u} />
         ))}
       </div>
     );
   }
   if (urls.length === 3) {
     return (
-      <div className="grid aspect-square grid-cols-2 grid-rows-2 gap-[2px] bg-black">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={urls[0]}
-          alt=""
-          className="row-span-2 h-full w-full object-cover"
-          loading="lazy"
-        />
+      <div className="grid aspect-square grid-cols-2 grid-rows-2 gap-[2px] bg-surface">
+        <CoverImg src={urls[0]!} spanRow />
         {urls.slice(1, 3).map((u, i) => (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            key={i}
-            src={u}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
+          <CoverImg key={i} src={u} />
         ))}
       </div>
     );
   }
   return (
-    <div className="grid aspect-square grid-cols-2 grid-rows-2 gap-[2px] bg-black">
+    <div className="grid aspect-square grid-cols-2 grid-rows-2 gap-[2px] bg-surface">
       {urls.slice(0, 4).map((u, i) => (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          key={i}
-          src={u}
-          alt=""
-          className="h-full w-full object-cover"
-          loading="lazy"
-        />
+        <CoverImg key={i} src={u} />
       ))}
     </div>
+  );
+}
+
+function CoverEmpty({ spanRow }: { spanRow?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "grid h-full w-full place-items-center bg-surface text-text-subtle",
+        spanRow && "row-span-2",
+      )}
+    >
+      <ImageOff className="h-5 w-5" strokeWidth={1.6} />
+    </div>
+  );
+}
+
+function CoverImg({ src, spanRow }: { src: string; spanRow?: boolean }) {
+  const [errored, setErrored] = useState(false);
+  if (errored) {
+    return <CoverEmpty spanRow={spanRow} />;
+  }
+  return (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setErrored(true)}
+      className={cn("h-full w-full object-cover", spanRow && "row-span-2")}
+    />
   );
 }
 
