@@ -262,7 +262,7 @@ export function PostDetailModal({
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-t py-3 md:border-y">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-t py-3 ">
                     <ToggleStat
                       active={isLiked}
                       activeClass="bg-red-500 text-white hover:bg-red-600"
