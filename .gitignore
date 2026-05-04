@@ -39,3 +39,9 @@ pnpm-debug.log*
 
 # misc
 /coverage
+
+# supabase cli scratch
+/supabase/.temp/
+
+# stray "null" output from accidental redirects
+/null
