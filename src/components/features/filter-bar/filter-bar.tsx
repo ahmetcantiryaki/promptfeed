@@ -16,7 +16,8 @@ interface FilterBarProps {
 }
 
 const SORT_OPTIONS: FilterOption[] = [
-  { value: "newest", label: "Newest First" },
+  { value: "newest", label: "Latest" },
+  { value: "oldest", label: "Oldest" },
   { value: "top", label: "Top Liked" },
 ];
 

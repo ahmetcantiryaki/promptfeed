@@ -8,7 +8,9 @@ import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import type { MediaType, PostSort } from "@/types/domain";
 
 function pickSort(raw: string | null): PostSort {
-  return raw === "top" ? "top" : "newest";
+  if (raw === "top") return "top";
+  if (raw === "oldest") return "oldest";
+  return "newest";
 }
 
 function pickMediaType(raw: string | null): MediaType | undefined {
@@ -23,12 +25,12 @@ function parseCursor(raw: string | null): PostsCursor | null {
     if (
       parsed &&
       typeof parsed === "object" &&
-      "posted_at" in parsed &&
+      "created_at" in parsed &&
       "id" in parsed
     ) {
-      const c = parsed as { posted_at: unknown; id: unknown };
-      if (typeof c.posted_at === "string" && typeof c.id === "string") {
-        return { posted_at: c.posted_at, id: c.id };
+      const c = parsed as { created_at: unknown; id: unknown };
+      if (typeof c.created_at === "string" && typeof c.id === "string") {
+        return { created_at: c.created_at, id: c.id };
       }
     }
     return null;

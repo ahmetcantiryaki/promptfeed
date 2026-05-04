@@ -37,7 +37,9 @@ interface SearchParams {
 }
 
 function parseSort(raw?: string): PostSort {
-  return raw === "top" ? "top" : "newest";
+  if (raw === "top") return "top";
+  if (raw === "oldest") return "oldest";
+  return "newest";
 }
 
 function encodeCursor(cursor: PostsCursor | null): string | null {

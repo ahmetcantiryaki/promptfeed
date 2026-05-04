@@ -42,7 +42,12 @@ function readUrlState(
   return {
     model: params.get("model") ?? undefined,
     platform: params.get("platform") ?? undefined,
-    sort: params.get("sort") === "top" ? "top" : "newest",
+    sort:
+      params.get("sort") === "top"
+        ? "top"
+        : params.get("sort") === "oldest"
+          ? "oldest"
+          : "newest",
     view: params.get("view") === "saved" ? "saved" : "feed",
     folder: params.get("folder") ?? undefined,
     q: params.get("q") ?? undefined,
@@ -54,6 +59,7 @@ function buildSearch(state: FeedFilterState): string {
   if (state.model) params.set("model", state.model);
   if (state.platform) params.set("platform", state.platform);
   if (state.sort === "top") params.set("sort", "top");
+  else if (state.sort === "oldest") params.set("sort", "oldest");
   if (state.view === "saved") params.set("view", "saved");
   if (state.folder) params.set("folder", state.folder);
   if (state.q && state.q.trim()) params.set("q", state.q.trim());

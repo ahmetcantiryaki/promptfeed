@@ -38,10 +38,15 @@ export async function listPosts(filters: PostFilters = {}): Promise<Post[]> {
     }
   }
 
-  query =
-    filters.sort === "top"
-      ? query.order("likes", { ascending: false }).order("posted_at", { ascending: false })
-      : query.order("posted_at", { ascending: false });
+  if (filters.sort === "top") {
+    query = query
+      .order("likes", { ascending: false })
+      .order("created_at", { ascending: false });
+  } else if (filters.sort === "oldest") {
+    query = query.order("created_at", { ascending: true });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
 
   query = query.limit(filters.limit ?? 60);
 
@@ -219,7 +224,8 @@ export async function getOwnerProfiles(
 }
 
 export interface PostsCursor {
-  posted_at: string;
+  /** Tuple anchor: posts.created_at (Feedlens insert time, NOT source post_at). */
+  created_at: string;
   id: string;
 }
 
@@ -281,34 +287,41 @@ export async function listPostsPaged(
     );
   }
 
-  // "top" sort uses likes desc — cursor pagination on likes is unstable
-  // because likes change. For "top", fall back to offsetless ordering and
-  // rely on a hard limit (no infinite scroll past first page in that mode
-  // would defeat the design — so we still paginate by (likes, posted_at, id)
-  // tuple cursor when needed).
+  // Sort + keyset cursor on (created_at, id):
+  //  - newest: created_at DESC, id DESC; cursor narrows to rows strictly after
+  //  - oldest: created_at ASC,  id ASC;  cursor narrows the other direction
+  //  - top:    likes DESC then created_at DESC; cursor is a pragmatic tiebreaker
+  //            on (created_at, id) only — likes can drift but the hard limit
+  //            keeps the result set bounded.
   const sort = filters.sort ?? "newest";
   const limit = filters.limit ?? 30;
 
   if (sort === "top") {
     query = query
       .order("likes", { ascending: false })
-      .order("posted_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .order("id", { ascending: false });
-    // Cursor on (posted_at, id) tiebreakers only when likes ties are rare
-    // enough — for production correctness we keyset on (posted_at, id) within
-    // the descending-likes ordering. This is a pragmatic compromise.
     if (cursor) {
       query = query.or(
-        `posted_at.lt.${cursor.posted_at},and(posted_at.eq.${cursor.posted_at},id.lt.${cursor.id})`,
+        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
+      );
+    }
+  } else if (sort === "oldest") {
+    query = query
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+    if (cursor) {
+      query = query.or(
+        `created_at.gt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.gt.${cursor.id})`,
       );
     }
   } else {
     query = query
-      .order("posted_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .order("id", { ascending: false });
     if (cursor) {
       query = query.or(
-        `posted_at.lt.${cursor.posted_at},and(posted_at.eq.${cursor.posted_at},id.lt.${cursor.id})`,
+        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
       );
     }
   }
@@ -321,7 +334,7 @@ export async function listPostsPaged(
   const last = posts[posts.length - 1];
   const nextCursor =
     posts.length === limit && last
-      ? { posted_at: last.posted_at, id: last.id }
+      ? { created_at: last.created_at, id: last.id }
       : null;
   return { posts, nextCursor };
 }

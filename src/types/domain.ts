@@ -22,7 +22,7 @@ export interface SaveFolderSummary extends SaveFolder {
   cover_urls: string[];
 }
 
-export type PostSort = "newest" | "top";
+export type PostSort = "newest" | "oldest" | "top";
 
 export interface PostFilters {
   model?: string;
