@@ -4,7 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Dialog from "@radix-ui/react-dialog";
-import { LogOut, Settings, ImagePlus, ShieldCheck } from "lucide-react";
+import {
+  LogOut,
+  Settings,
+  ImagePlus,
+  ShieldCheck,
+  User as UserIcon,
+} from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import type {
   AvatarConfig,
@@ -45,15 +51,21 @@ export function UserMenu({
           <button
             type="button"
             aria-label="Account menu"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors hover:bg-hover sm:h-9 sm:w-9"
-            style={{ padding: 0 }}
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border bg-surface px-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:bg-hover hover:text-text sm:h-9 sm:w-9 sm:gap-0 sm:rounded-full sm:border-0 sm:bg-transparent sm:p-0 sm:hover:bg-hover"
           >
-            <UserAvatar
-              config={avatarConfig}
-              url={avatarUrl}
-              email={user.email}
-              size={36}
+            <UserIcon
+              className="h-4 w-4 shrink-0 sm:hidden"
+              strokeWidth={1.8}
             />
+            <span className="sm:hidden">Account</span>
+            <span className="hidden sm:block">
+              <UserAvatar
+                config={avatarConfig}
+                url={avatarUrl}
+                email={user.email}
+                size={36}
+              />
+            </span>
           </button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>

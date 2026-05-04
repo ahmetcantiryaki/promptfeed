@@ -20,6 +20,8 @@ export interface FeedFilterState {
   sort: PostSort;
   view: FeedView;
   folder?: string;
+  /** Free-text search query (prompt body, source user, curator handle). */
+  q?: string;
 }
 
 export interface FeedFilterContextValue {
@@ -43,6 +45,7 @@ function readUrlState(
     sort: params.get("sort") === "top" ? "top" : "newest",
     view: params.get("view") === "saved" ? "saved" : "feed",
     folder: params.get("folder") ?? undefined,
+    q: params.get("q") ?? undefined,
   };
 }
 
@@ -53,6 +56,7 @@ function buildSearch(state: FeedFilterState): string {
   if (state.sort === "top") params.set("sort", "top");
   if (state.view === "saved") params.set("view", "saved");
   if (state.folder) params.set("folder", state.folder);
+  if (state.q && state.q.trim()) params.set("q", state.q.trim());
   return params.toString();
 }
 

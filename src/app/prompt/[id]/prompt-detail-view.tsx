@@ -303,7 +303,7 @@ function EditorFooter({
   const xUrl = owner.xUrl ?? fallbackXUrl;
   const inner = (
     <>
-      <span className="text-text-subtle">Creator</span>
+      <span className="text-text-subtle">Curator</span>
       <span className="font-semibold text-text">{handle}</span>
       {xUrl ? (
         <ExternalLink

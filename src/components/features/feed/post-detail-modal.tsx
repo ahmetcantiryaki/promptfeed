@@ -115,7 +115,7 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
       <Dialog.Portal>
         <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] bg-black/85 backdrop-blur-xl" />
         <Dialog.Content
-          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] grid h-[96vh] w-[96vw] max-w-[1440px] -translate-x-1/2 -translate-y-1/2 grid-cols-1 overflow-hidden rounded-[16px] outline-none md:grid-cols-[70%_30%]"
+          className="pf-modal-content fixed inset-0 z-[70] flex flex-col overflow-y-auto overflow-x-hidden bg-bg outline-none md:left-1/2 md:top-1/2 md:inset-auto md:grid md:h-[96vh] md:w-[96vw] md:max-w-[1440px] md:-translate-x-1/2 md:-translate-y-1/2 md:grid-cols-[70%_30%] md:overflow-hidden md:rounded-[16px]"
           aria-describedby={undefined}
         >
           <Dialog.Title className="sr-only">
@@ -128,32 +128,49 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
                 <button
                   type="button"
                   aria-label="Close"
-                  className="absolute right-3 top-3 z-40 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur-md transition-colors hover:bg-black/75"
+                  className="fixed right-3 top-3 z-40 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur-md transition-colors hover:bg-black/75 md:absolute"
                 >
                   <X className="h-4 w-4" strokeWidth={2} />
                 </button>
               </Dialog.Close>
 
               {/* LEFT — image area */}
-              <div className="relative flex items-center justify-center overflow-hidden bg-black">
+              <div className="relative w-full bg-black md:flex md:items-center md:justify-center md:overflow-hidden">
                 {post.prompt_type === "remix" && post.source_image_url ? (
-                  <RemixCurtain
-                    inputUrl={post.source_image_url}
-                    outputUrl={post.media_url}
-                    alt={post.prompt.slice(0, 80)}
-                    fit="contain"
-                  />
+                  <>
+                    <div className="block md:hidden">
+                      <RemixCurtain
+                        inputUrl={post.source_image_url}
+                        outputUrl={post.media_url}
+                        alt={post.prompt.slice(0, 80)}
+                        fit="natural"
+                      />
+                    </div>
+                    <div className="hidden md:block md:h-full md:w-full">
+                      <RemixCurtain
+                        inputUrl={post.source_image_url}
+                        outputUrl={post.media_url}
+                        alt={post.prompt.slice(0, 80)}
+                        fit="contain"
+                      />
+                    </div>
+                  </>
                 ) : (post.extra_image_urls?.length ?? 0) > 0 ? (
-                  <DetailImageSlider
-                    images={[post.media_url, ...(post.extra_image_urls ?? [])]}
-                    alt={post.prompt.slice(0, 80)}
-                  />
+                  <div className="h-[60vh] w-full md:h-full">
+                    <DetailImageSlider
+                      images={[
+                        post.media_url,
+                        ...(post.extra_image_urls ?? []),
+                      ]}
+                      alt={post.prompt.slice(0, 80)}
+                    />
+                  </div>
                 ) : (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={post.media_url}
                     alt={post.prompt.slice(0, 80)}
-                    className="max-h-full max-w-full object-contain"
+                    className="block h-auto w-full md:max-h-full md:w-auto md:max-w-full md:object-contain"
                   />
                 )}
 
@@ -165,11 +182,11 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
                 ) : null}
               </div>
 
-              {/* RIGHT — details panel */}
-              <aside className="flex min-w-0 flex-col overflow-hidden border-l bg-surface">
+              {/* RIGHT — details panel (stacks below image on mobile) */}
+              <aside className="flex min-w-0 flex-col bg-surface md:overflow-hidden md:border-l">
                 <DetailHeader post={post} />
 
-                <div className="flex min-h-0 flex-1 flex-col gap-5 px-5 py-5">
+                <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-5 sm:py-5">
                   <div className="shrink-0">
                     <Field label="Model">
                       <div className="flex items-center gap-2">
@@ -182,19 +199,31 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
                   </div>
 
                   <div className="flex min-h-0 flex-1 flex-col gap-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
                         Prompt
                       </div>
-                      {isJson ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
-                          <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
-                          JSON
-                        </span>
-                      ) : null}
+                      <div className="flex items-center gap-1.5">
+                        {isJson ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
+                            <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
+                            JSON
+                          </span>
+                        ) : null}
+                        {/* Mobile-only inline copy — desktop has labelled buttons below */}
+                        <button
+                          type="button"
+                          onClick={copyPrompt}
+                          aria-label="Copy prompt"
+                          className="inline-flex h-7 items-center gap-1 rounded-[7px] border bg-surface-2 px-2 text-[11px] font-semibold text-text-muted transition-colors hover:bg-hover hover:text-text md:hidden"
+                        >
+                          <Copy className="h-3 w-3" strokeWidth={2} />
+                          Copy
+                        </button>
+                      </div>
                     </div>
                     <PromptBody post={post} parsedJson={parsedJson} />
-                    <div className="flex items-center gap-2">
+                    <div className="hidden items-center gap-2 md:flex">
                       <button
                         type="button"
                         onClick={copyPrompt}
@@ -216,7 +245,7 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-y py-3">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-t py-3 md:border-y">
                     <ToggleStat
                       active={isLiked}
                       activeClass="bg-red-500 text-white hover:bg-red-600"
@@ -332,14 +361,14 @@ function PromptBody({ post, parsedJson }: { post: Post; parsedJson: unknown | nu
   if (parsedJson !== null) {
     const pretty = JSON.stringify(parsedJson, null, 2);
     return (
-      <pre className="min-h-0 flex-1 overflow-auto rounded-[10px] border bg-surface-2 p-3 font-mono text-[12px] leading-[1.55] text-text">
+      <pre className="h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-[10px] border bg-surface-2 p-3 font-mono text-[12px] leading-[1.55] text-text md:h-auto md:min-h-0 md:flex-1 md:whitespace-pre">
         {pretty}
       </pre>
     );
   }
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto rounded-[10px] border bg-surface-2 p-3">
-      <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-text">
+    <div className="h-[220px] overflow-y-auto rounded-[10px] border bg-surface-2 p-3 md:h-auto md:min-h-0 md:flex-1">
+      <p className="whitespace-pre-wrap break-words text-[13px] leading-[1.6] text-text">
         {post.prompt}
       </p>
     </div>
@@ -352,7 +381,7 @@ function EditorFooter({ owner }: { owner: OwnerInfo | null }) {
   const xUrl = owner.xUrl;
   const inner = (
     <>
-      <span className="text-text-subtle">Creator</span>
+      <span className="text-text-subtle">Curator</span>
       <span className="font-semibold text-text">{handle}</span>
       {xUrl ? (
         <ExternalLink

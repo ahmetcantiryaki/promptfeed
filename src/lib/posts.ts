@@ -5,6 +5,12 @@ import type { Model, Platform, Post, PostFilters } from "@/types/domain";
 export const OTHER_SLUG = "other";
 const OTHER_LABEL = "Other";
 
+/** Escape characters that have special meaning in PostgREST `ilike` filters
+ *  and inside Supabase's `.or()` comma-list. */
+function escapeIlike(s: string): string {
+  return s.replace(/[\\%_,()]/g, "\\$&");
+}
+
 export async function listPosts(filters: PostFilters = {}): Promise<Post[]> {
   const supabase = await createClient();
   let query = supabase.from("posts").select("*");
@@ -250,6 +256,29 @@ export async function listPostsPaged(
     } else {
       query = query.eq("platform_slug", filters.platform);
     }
+  }
+
+  // Free-text search across prompt body, source_user (legacy author), and the
+  // external creator handle/URL. Supabase `.or` takes a comma-separated list
+  // of `column.op.value` clauses; we ilike-match each candidate column.
+  if (filters.q && filters.q.trim().length > 0) {
+    const term = escapeIlike(filters.q.trim());
+    const pattern = `%${term}%`;
+    query = query.or(
+      [
+        `prompt.ilike.${pattern}`,
+        // Post owner / author fields (legacy + URL-derived)
+        `source_user.ilike.${pattern}`,
+        `source_url.ilike.${pattern}`,
+        // External curator (the person who attributed/posted it on social)
+        `external_creator_handle.ilike.${pattern}`,
+        `external_creator_url.ilike.${pattern}`,
+        `external_creator_platform.ilike.${pattern}`,
+        // Taxonomy slugs so e.g. "midjourney" or "reddit" match
+        `model_slug.ilike.${pattern}`,
+        `platform_slug.ilike.${pattern}`,
+      ].join(","),
+    );
   }
 
   // "top" sort uses likes desc — cursor pagination on likes is unstable

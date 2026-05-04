@@ -33,6 +33,7 @@ interface SearchParams {
   sort?: string;
   view?: string;
   folder?: string;
+  q?: string;
 }
 
 function parseSort(raw?: string): PostSort {
@@ -143,6 +144,7 @@ export default async function Home({
       mediaType: "image",
       sort: parseSort(params.sort),
       limit: 30,
+      q: params.q?.trim() ? params.q.trim().slice(0, 80) : undefined,
     });
     const ownerIds = posts
       .map((p) => p.owner_id)

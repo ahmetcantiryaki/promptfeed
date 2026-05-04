@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
+import { GoogleButton } from "@/components/features/auth/google-button";
 
 export function LoginForm() {
   const router = useRouter();
@@ -58,6 +59,14 @@ export function LoginForm() {
           {error}
         </div>
       ) : null}
+      <div className="mt-1 flex flex-col gap-3">
+        <GoogleButton label="Sign in with Google" next="/" />
+        <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-text-subtle">
+          <span className="h-px flex-1 bg-border" />
+          or
+          <span className="h-px flex-1 bg-border" />
+        </div>
+      </div>
       <button
         type="submit"
         disabled={loading}

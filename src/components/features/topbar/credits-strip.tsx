@@ -1,4 +1,5 @@
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
+import { LogoMark } from "@/components/ui/logo-mark";
 
 interface Creator {
   handle: string;
@@ -11,13 +12,14 @@ const CREATORS: Creator[] = [
 ];
 
 /**
- * "Created by @handle · @handle" — clean, text-only, minimal hover.
- * Each handle is a link that softly shifts color and draws an underline
- * animation on hover. No background swap, no icons.
+ * Desktop: "Created by @handle · @handle" text-only credits.
+ * Below md the topbar uses <MobileLogoCredits /> instead, which alternates
+ * between the logo and the credits inside a fixed-size container so that
+ * right-side actions (theme toggle, sign-in/account) never shift.
  */
 export function CreditsStrip() {
   return (
-    <div className="flex min-w-0 items-center gap-2 text-[13px]">
+    <div className="hidden min-w-0 items-center gap-2 text-[13px] md:flex">
       <span className="hidden shrink-0 font-semibold tracking-tight text-text sm:inline">
         Created by
       </span>
@@ -31,6 +33,55 @@ export function CreditsStrip() {
           </Fragment>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Mobile-only fixed-width centerpiece. Cycles vertically (always up) through
+ * Logo → "Created by @eyupyusufa" → "Created by @ahmetcantryk" → Logo (loop
+ * wrap). The container has a fixed height/width so right-side controls
+ * (theme toggle, sign-in/account) never reflow.
+ */
+export function MobileLogoCredits() {
+  return (
+    <div
+      aria-label="Feedlens.ai · Created by @eyupyusufa, @ahmetcantryk"
+      className="relative h-5 w-[160px] max-w-full shrink overflow-hidden md:hidden"
+    >
+      <div className="pf-credit-rotate flex flex-col">
+        <CenteredRow>
+          <LogoMark height={16} />
+        </CenteredRow>
+        {CREATORS.map((c) => (
+          <CenteredRow key={c.handle}>
+            <span className="whitespace-nowrap text-[11px] leading-none">
+              <span className="text-text-subtle">Created by </span>
+              <a
+                href={c.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-text transition-colors hover:text-text"
+              >
+                {c.handle}
+              </a>
+            </span>
+          </CenteredRow>
+        ))}
+        {/* Duplicate first child to make the loop seamless when we snap from
+            -75% back to 0. */}
+        <CenteredRow>
+          <LogoMark height={16} />
+        </CenteredRow>
+      </div>
+    </div>
+  );
+}
+
+function CenteredRow({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex h-5 shrink-0 items-center justify-start">
+      {children}
     </div>
   );
 }

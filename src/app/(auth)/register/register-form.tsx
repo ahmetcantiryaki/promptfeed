@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/browser";
 import { registerAction } from "./actions";
+import { GoogleButton } from "@/components/features/auth/google-button";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -94,6 +95,14 @@ export function RegisterForm() {
           {error}
         </div>
       ) : null}
+      <div className="mt-1 flex flex-col gap-3">
+        <GoogleButton label="Sign up with Google" next="/" />
+        <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-text-subtle">
+          <span className="h-px flex-1 bg-border" />
+          or
+          <span className="h-px flex-1 bg-border" />
+        </div>
+      </div>
       <button
         type="submit"
         disabled={loading}

@@ -30,6 +30,8 @@ export interface PostFilters {
   mediaType?: MediaType;
   sort?: PostSort;
   limit?: number;
+  /** Free-text search across prompt body, source_user, and external creator handle/url. */
+  q?: string;
 }
 
 // react-nice-avatar config shape

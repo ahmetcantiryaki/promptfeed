@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/browser";
 import { registerAction } from "@/app/(auth)/register/actions";
 import { requestPasswordReset } from "@/app/(auth)/forgot-password/actions";
+import { GoogleButton } from "@/components/features/auth/google-button";
 
 type View = "signin" | "register" | "forgot";
 
@@ -173,6 +174,10 @@ function SignInView({
           required
         />
         {error ? <ErrorBox message={error} /> : null}
+        <div className="mt-1 flex flex-col gap-3">
+          <GoogleButton label="Sign in with Google" />
+          <Divider />
+        </div>
         <SubmitButton loading={loading} label="Sign in" />
         <button
           type="button"
@@ -286,6 +291,10 @@ function RegisterView({
           At least 10 characters with letters and numbers.
         </p>
         {error ? <ErrorBox message={error} /> : null}
+        <div className="mt-1 flex flex-col gap-3">
+          <GoogleButton label="Sign up with Google" />
+          <Divider />
+        </div>
         <SubmitButton loading={loading} label="Create account" />
       </form>
       <FooterSwap
@@ -368,6 +377,16 @@ function ForgotView({ onSignIn }: { onSignIn: () => void }) {
       {error ? <ErrorBox message={error} /> : null}
       <SubmitButton loading={loading} label="Send reset link" />
     </form>
+  );
+}
+
+function Divider() {
+  return (
+    <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-text-subtle">
+      <span className="h-px flex-1 bg-border" />
+      or
+      <span className="h-px flex-1 bg-border" />
+    </div>
   );
 }
 

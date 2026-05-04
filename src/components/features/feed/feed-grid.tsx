@@ -22,37 +22,29 @@ const COL_RESPONSIVE: Record<number, number> = {
   5: 5,
 };
 
-// Tailwind md breakpoint (768px) — at and above this the user-selected column
-// count is honoured. Below md we derive columns from the viewport width.
+// Tailwind md breakpoint (768px) — at and above this the user-selected
+// desktop column count is honoured. Below md, the user picks 1 or 2 columns
+// via the mobile grid selector (stored in useGridSize).
 const MD_BREAKPOINT = 768;
-const TWO_COL_BREAKPOINT = 420;
 
-function useResponsiveColumnCount(desktopCols: number): number {
+function useResponsiveColumnCount(
+  desktopCols: number,
+  mobileCols: number,
+): number {
   const [cols, setCols] = useState<number>(() => {
     if (typeof window === "undefined") return desktopCols;
-    const w = window.innerWidth;
-    if (w < TWO_COL_BREAKPOINT) return 1;
-    if (w < MD_BREAKPOINT) return 2;
-    return desktopCols;
+    return window.innerWidth < MD_BREAKPOINT ? mobileCols : desktopCols;
   });
 
   useEffect(() => {
     function compute() {
       const w = window.innerWidth;
-      if (w < TWO_COL_BREAKPOINT) {
-        setCols(1);
-        return;
-      }
-      if (w < MD_BREAKPOINT) {
-        setCols(2);
-        return;
-      }
-      setCols(desktopCols);
+      setCols(w < MD_BREAKPOINT ? mobileCols : desktopCols);
     }
     compute();
     window.addEventListener("resize", compute);
     return () => window.removeEventListener("resize", compute);
-  }, [desktopCols]);
+  }, [desktopCols, mobileCols]);
 
   return cols;
 }
@@ -78,11 +70,11 @@ export function FeedGrid({
   hasMore = false,
   loadingMore = false,
 }: Props) {
-  const { cols: storedCols } = useGridSize();
+  const { cols: storedCols, mobileCols } = useGridSize();
   const [active, setActive] = useState<Post | null>(null);
 
   const desktopCols = COL_RESPONSIVE[storedCols] ?? 4;
-  const columnCount = useResponsiveColumnCount(desktopCols);
+  const columnCount = useResponsiveColumnCount(desktopCols, mobileCols);
 
   // Map of post.id -> measured rendered height (px). Cards report their
   // height via ResizeObserver after their image loads.

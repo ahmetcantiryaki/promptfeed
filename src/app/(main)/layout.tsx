@@ -75,7 +75,7 @@ export default async function MainLayout({
               savedCount={saveData.savedIds.length}
             />
             <main className="flex min-w-0 flex-col">
-              <div className="sticky top-0 z-40 bg-surface">
+              <div className="z-40 bg-surface md:sticky md:top-0">
                 <Topbar
                   user={user}
                   profile={profile}

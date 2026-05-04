@@ -55,6 +55,8 @@ export async function GET(request: Request) {
   const platform = searchParams.get("platform") ?? undefined;
   const mediaType = pickMediaType(searchParams.get("type"));
   const sort = pickSort(searchParams.get("sort"));
+  const rawQ = searchParams.get("q") ?? "";
+  const q = rawQ.trim().slice(0, 80) || undefined;
   const limit = Math.min(
     Math.max(Number.parseInt(searchParams.get("limit") ?? "30", 10) || 30, 1),
     60,
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
   const cursor = parseCursor(searchParams.get("cursor"));
 
   const { posts, nextCursor } = await listPostsPaged(
-    { model, platform, mediaType, sort, limit },
+    { model, platform, mediaType, sort, limit, q },
     cursor,
   );
   const ownerIds = posts

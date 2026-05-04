@@ -1,7 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Bookmark, Folder } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  Bookmark,
+  Folder,
+  Sparkles,
+  Cpu,
+  Globe,
+} from "lucide-react";
+import { formatCount } from "@/lib/utils";
 import type {
   Model,
   Platform,
@@ -123,6 +131,7 @@ export function HomeContent({
           if (state.model) params.set("model", state.model);
           if (state.platform) params.set("platform", state.platform);
           if (state.sort === "top") params.set("sort", "top");
+          if (state.q && state.q.trim()) params.set("q", state.q.trim());
           params.set("limit", String(PAGE_SIZE));
           const res = await fetch(`/api/posts?${params.toString()}`, {
             signal: ac.signal,
@@ -151,7 +160,7 @@ export function HomeContent({
       ac.abort();
       progressRef.current.done();
     };
-  }, [state.view, state.model, state.platform, state.sort, state.folder]);
+  }, [state.view, state.model, state.platform, state.sort, state.folder, state.q]);
 
   const loadMore = useCallback(async () => {
     if (loadMoreInFlight.current) return;
@@ -163,6 +172,7 @@ export function HomeContent({
       if (state.model) params.set("model", state.model);
       if (state.platform) params.set("platform", state.platform);
       if (state.sort === "top") params.set("sort", "top");
+      if (state.q && state.q.trim()) params.set("q", state.q.trim());
       params.set("limit", String(PAGE_SIZE));
       params.set("cursor", feed.nextCursor);
       const res = await fetch(`/api/posts?${params.toString()}`, {
@@ -186,17 +196,18 @@ export function HomeContent({
       loadMoreInFlight.current = false;
       setLoadingMore(false);
     }
-  }, [feed, state.model, state.platform, state.sort]);
+  }, [feed, state.model, state.platform, state.sort, state.q]);
 
   return (
     <>
       {state.view === "feed" ? (
-        <div className="sticky top-[60px] z-30 bg-surface">
-          <FilterBar models={models} platforms={platforms} />
-        </div>
+        <FilterBarSticky models={models} platforms={platforms} />
       ) : null}
 
-      <div className="px-3 pb-10 pt-6 sm:px-5 lg:px-7">
+      <div className="px-3 pb-10 pt-4 sm:px-5 sm:pt-6 lg:px-7">
+        {state.view === "feed" ? (
+          <StatsStrip models={models} platforms={platforms} />
+        ) : null}
         {state.view === "saved" ? (
           <SavedHeader detail={folderDetail} folders={folders ?? []} />
         ) : null}
@@ -285,6 +296,100 @@ function ContentBody({
       hasMore={Boolean(feed?.nextCursor)}
       loadingMore={loadingMore}
     />
+  );
+}
+
+/**
+ * Sticky filter bar that animates on stick. A 0px sentinel right above the
+ * wrapper enters/exits the viewport's top edge as the user scrolls past the
+ * (mobile) topbar. We toggle a `data-pf-filter-stuck` attribute that triggers
+ * a tiny slide-down + shadow via CSS, matching iOS/native nav-bar feel.
+ */
+function FilterBarSticky({
+  models,
+  platforms,
+}: {
+  models: Model[];
+  platforms: Platform[];
+}) {
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setStuck(!entry?.isIntersecting),
+      { threshold: 0, rootMargin: "0px 0px 0px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <>
+      {/* Zero-height sentinel — visible when the page is unscrolled, hidden
+          (above viewport) once the user scrolls past the topbar. */}
+      <div ref={sentinelRef} aria-hidden="true" className="h-0" />
+      <div
+        data-pf-filter-stuck={stuck ? "true" : "false"}
+        className="sticky top-0 z-30 bg-surface md:top-[calc(60px-1px)]"
+      >
+        <FilterBar models={models} platforms={platforms} />
+      </div>
+    </>
+  );
+}
+
+function StatsStrip({
+  models,
+  platforms,
+}: {
+  models: Model[];
+  platforms: Platform[];
+}) {
+  const totalPrompts = useMemo(
+    () => models.reduce((sum, m) => sum + (m.post_count ?? 0), 0),
+    [models],
+  );
+  const modelCount = models.length;
+  const platformCount = platforms.length;
+  const items: Array<{
+    label: string;
+    value: number;
+    icon: React.ReactNode;
+  }> = [
+    {
+      label: "Prompts",
+      value: totalPrompts,
+      icon: <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />,
+    },
+    {
+      label: "Models",
+      value: modelCount,
+      icon: <Cpu className="h-3.5 w-3.5" strokeWidth={2} />,
+    },
+    {
+      label: "Platforms",
+      value: platformCount,
+      icon: <Globe className="h-3.5 w-3.5" strokeWidth={2} />,
+    },
+  ];
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 sm:mb-5">
+      {items.map((it) => (
+        <span
+          key={it.label}
+          className="inline-flex items-center gap-1.5 rounded-full border bg-surface-2/60 px-2.5 py-1 text-[12px] font-medium text-text-muted"
+        >
+          <span className="text-text-subtle">{it.icon}</span>
+          <span className="font-semibold tabular-nums text-text">
+            {formatCount(it.value)}
+          </span>
+          <span>{it.label}</span>
+        </span>
+      ))}
+    </div>
   );
 }
 

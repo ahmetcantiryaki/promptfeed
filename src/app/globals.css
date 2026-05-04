@@ -50,6 +50,9 @@
     letter-spacing: -0.005em;
     -webkit-font-smoothing: antialiased;
     font-feature-settings: "ss01", "ss02", "cv11", "calt", "liga";
+    /* `clip` — like `hidden` but does NOT create a new containing block for
+       fixed/sticky descendants, so topbar + sidebar still stick to viewport. */
+    overflow-x: clip;
   }
 
   * {
@@ -205,6 +208,54 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .pf-card-in {
+    animation: none;
+  }
+}
+
+/* ---------- Sticky filter bar: subtle pin-down on stick ---------- */
+@keyframes pf-filter-pin {
+  from {
+    transform: translateY(-4px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+[data-pf-filter-stuck="true"] {
+  animation: pf-filter-pin 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.18);
+}
+[data-pf-filter-stuck="false"] {
+  box-shadow: none;
+  transition: box-shadow 200ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-pf-filter-stuck="true"] {
+    animation: none;
+  }
+}
+
+/* ---------- Mobile topbar: logo → credit1 → credit2 → loop (always up) ----
+   Inner container holds 4 children stacked vertically (logo, credit1,
+   credit2, logo-duplicate-for-wrap), each 20px tall = 80px total. Visible
+   window is 20px. We translate by -25% per step (= one child) and snap
+   instantly from -75% back to 0 — visually seamless because the 4th child
+   is a duplicate of the 1st. */
+@keyframes pf-credit-rotate {
+  0%, 22% { transform: translateY(0); }         /* logo */
+  28%, 47% { transform: translateY(-25%); }     /* credit 1 */
+  53%, 72% { transform: translateY(-50%); }     /* credit 2 */
+  78%, 99.999% { transform: translateY(-75%); } /* logo loop-wrap */
+  100% { transform: translateY(0); }            /* instant snap */
+}
+.pf-credit-rotate {
+  animation: pf-credit-rotate 16s ease-in-out infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-credit-rotate {
     animation: none;
   }
 }

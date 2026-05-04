@@ -15,35 +15,14 @@ interface Props {
 interface ReasonOption {
   value: string;
   label: string;
-  description: string;
 }
 
 const REASONS: ReasonOption[] = [
-  {
-    value: "spam",
-    label: "Spam or misleading",
-    description: "Repetitive, off-topic, or promotional content.",
-  },
-  {
-    value: "inappropriate",
-    label: "Inappropriate content",
-    description: "Violent, adult, or otherwise disturbing imagery.",
-  },
-  {
-    value: "copyright",
-    label: "Copyright",
-    description: "An image or prompt used without permission.",
-  },
-  {
-    value: "harassment",
-    label: "Harassment or hate",
-    description: "Content that attacks a person or group.",
-  },
-  {
-    value: "other",
-    label: "Other",
-    description: "Tell us more below.",
-  },
+  { value: "spam", label: "Spam or misleading" },
+  { value: "inappropriate", label: "Inappropriate content" },
+  { value: "copyright", label: "Copyright" },
+  { value: "harassment", label: "Harassment or hate" },
+  { value: "other", label: "Other" },
 ];
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -102,40 +81,23 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/65 backdrop-blur-sm" />
-        <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-[90] flex max-h-[92dvh] w-[min(92vw,460px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
-          aria-describedby="report-desc"
-        >
-          <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
-            <div className="flex items-start gap-2.5">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-red-500/10 text-red-500">
-                <Flag className="h-4 w-4" strokeWidth={2} />
-              </div>
-              <div>
-                <Dialog.Title className="text-[15px] font-semibold tracking-tight">
-                  Report this prompt
-                </Dialog.Title>
-                <p
-                  id="report-desc"
-                  className="mt-0.5 text-[12px] text-text-muted"
-                >
-                  Your report goes to our team. You can only report each prompt
-                  once.
-                </p>
-              </div>
-            </div>
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-[90] flex max-h-[88dvh] w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[14px] border bg-surface shadow-2xl">
+          <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+            <Dialog.Title className="text-[14px] font-semibold tracking-tight">
+              Report
+            </Dialog.Title>
             <Dialog.Close asChild>
               <button
                 type="button"
                 aria-label="Close"
-                className="grid h-8 w-8 place-items-center rounded-[8px] text-text-muted transition-colors hover:bg-hover hover:text-text"
+                className="grid h-7 w-7 place-items-center rounded-[7px] text-text-muted transition-colors hover:bg-hover hover:text-text"
               >
-                <X className="h-4 w-4" strokeWidth={1.8} />
+                <X className="h-3.5 w-3.5" strokeWidth={1.8} />
               </button>
             </Dialog.Close>
           </div>
 
-          <div className="flex flex-col gap-4 overflow-y-auto px-5 py-4">
+          <div className="flex flex-col gap-3 overflow-y-auto px-4 py-3.5">
             <fieldset className="flex flex-col gap-1.5">
               <legend className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
                 Reason
@@ -147,10 +109,10 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
                     <label
                       key={opt.value}
                       className={cn(
-                        "flex min-h-10 cursor-pointer items-start gap-2.5 rounded-[10px] border px-3 py-2 transition-colors",
+                        "flex cursor-pointer items-center gap-2.5 rounded-[8px] border px-3 py-2 text-[13px] transition-colors",
                         active
-                          ? "border-accent/60 bg-accent/5"
-                          : "border-border bg-surface hover:bg-hover",
+                          ? "border-text bg-text/5 font-semibold text-text"
+                          : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
                       )}
                     >
                       <input
@@ -159,16 +121,20 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
                         value={opt.value}
                         checked={active}
                         onChange={() => setReason(opt.value)}
-                        className="mt-[3px] h-3.5 w-3.5 cursor-pointer accent-accent"
+                        className="sr-only"
                       />
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-semibold text-text">
-                          {opt.label}
-                        </span>
-                        <span className="text-[11px] text-text-subtle">
-                          {opt.description}
-                        </span>
-                      </div>
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 transition-colors",
+                          active ? "border-text" : "border-border-strong",
+                        )}
+                      >
+                        {active ? (
+                          <span className="h-2 w-2 rounded-full bg-text" />
+                        ) : null}
+                      </span>
+                      <span className="flex-1">{opt.label}</span>
                     </label>
                   );
                 })}
@@ -177,14 +143,15 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
 
             <label className="flex flex-col gap-1.5">
               <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
-                Details <span className="text-text-subtle normal-case">(optional, up to 500 characters)</span>
+                Details{" "}
+                <span className="text-text-subtle normal-case">(optional)</span>
               </span>
               <textarea
                 value={details}
                 onChange={(e) => setDetails(e.target.value.slice(0, 500))}
-                rows={4}
+                rows={3}
                 placeholder="A short note for the review team…"
-                className="resize-y rounded-[10px] border bg-surface-2 px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                className="resize-none rounded-[8px] border bg-surface-2 px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
               />
               <span className="self-end text-[10px] tabular-nums text-text-subtle">
                 {details.length} / 500
@@ -192,11 +159,11 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
             </label>
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t bg-surface-2/30 px-5 py-3">
+          <div className="flex items-center justify-end gap-2 border-t bg-surface-2/30 px-4 py-2.5">
             <Dialog.Close asChild>
               <button
                 type="button"
-                className="rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted hover:bg-hover hover:text-text"
+                className="rounded-[8px] px-3 py-1.5 text-[12px] font-medium text-text-muted hover:bg-hover hover:text-text"
               >
                 Cancel
               </button>
@@ -205,7 +172,7 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
               type="button"
               onClick={submit}
               disabled={!canSubmit}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-red-500 bg-red-500 px-3.5 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-[8px] bg-red-500 px-3 py-1.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

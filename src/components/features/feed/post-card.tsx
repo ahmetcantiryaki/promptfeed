@@ -110,9 +110,9 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
       ) : null}
 
       {/* Bottom action bar — always visible <md (touch); slides on hover/focus md+. */}
-      <div className="pf-card-bar absolute inset-x-0 bottom-0 z-20 max-md:!translate-y-0 max-md:!opacity-100 max-md:!pointer-events-auto bg-gradient-to-t from-black/90 via-black/55 to-transparent px-2.5 pb-2.5 pt-9 text-white sm:px-3 sm:pb-3 sm:pt-10">
-        <div className="flex items-center gap-2.5">
-          <div className="min-w-0 flex-1">
+      <div className="pf-card-bar absolute inset-x-0 bottom-0 z-20 max-md:!translate-y-0 max-md:!opacity-100 max-md:!pointer-events-auto bg-gradient-to-t from-black/90 via-black/55 to-transparent px-2 pb-2 pt-6 text-white sm:px-3 sm:pb-3 sm:pt-10">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="hidden min-w-0 flex-1 sm:block">
             <div className="truncate text-[12px] font-semibold leading-tight">
               {post.source_user}
             </div>
@@ -128,7 +128,7 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
             </div>
           </div>
 
-          <div className="pf-card-actions flex shrink-0 items-center gap-1.5 max-md:!pointer-events-auto">
+          <div className="pf-card-actions ml-auto flex shrink-0 items-center gap-1 max-md:!pointer-events-auto sm:gap-1.5">
             <ActionBtn
               label={isLiked ? "Unlike" : "Like"}
               active={isLiked}
@@ -245,10 +245,10 @@ function ViewChip({ count }: { count: number }) {
   return (
     <span
       aria-label={`Views: ${count}`}
-      className="inline-flex h-9 items-center gap-1 rounded-full bg-black/55 px-2.5 text-[11px] font-semibold tabular-nums text-white backdrop-blur-md sm:h-8"
+      className="inline-flex h-8 items-center gap-1 rounded-full bg-black/55 px-2 text-[11px] font-semibold tabular-nums text-white backdrop-blur-md sm:px-2.5"
     >
-      <BarChart3 className="h-4 w-4" strokeWidth={2} />
-      {formatCount(count)}
+      <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2} />
+      <span>{formatCount(count)}</span>
     </span>
   );
 }
@@ -262,7 +262,7 @@ function SourceBtn({ url }: { url: string | null }) {
       rel="noopener noreferrer"
       aria-label="Open source in new tab"
       onClick={(e) => e.stopPropagation()}
-      className="inline-flex h-9 items-center gap-1 rounded-full bg-black/55 px-2 text-white backdrop-blur-md transition-all hover:bg-black/75 active:scale-95 sm:h-8"
+      className="hidden h-9 items-center gap-1 rounded-full bg-black/55 px-2 text-white backdrop-blur-md transition-all hover:bg-black/75 active:scale-95 sm:inline-flex sm:h-8"
     >
       <ExternalLink className="h-4 w-4" strokeWidth={2} />
     </a>
@@ -287,12 +287,12 @@ function ActionBtn({
         onClick();
       }}
       className={cn(
-        "inline-flex h-9 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold tabular-nums backdrop-blur-md transition-all active:scale-95 sm:h-8",
+        "inline-flex h-8 items-center gap-1 rounded-full px-2 text-[11px] font-semibold tabular-nums backdrop-blur-md transition-all active:scale-95 sm:h-8 sm:px-2.5",
         active ? activeClass : "bg-black/55 text-white hover:bg-black/75",
       )}
     >
       {icon}
-      {children}
+      <span className="hidden sm:inline">{children}</span>
     </button>
   );
 }
