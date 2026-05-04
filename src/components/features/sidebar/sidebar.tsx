@@ -183,37 +183,18 @@ export function SidebarBody({
 
       <footer
         className={cn(
-          "mt-auto flex items-center gap-3 border-t px-2 text-[12px] text-text-subtle",
+          "mt-auto border-t px-2 text-[12px] text-text-subtle",
           isDrawer ? "pt-3" : "pt-2.5",
         )}
       >
-        <a
-          href="#"
+        <span
           className={cn(
-            "inline-flex items-center transition-colors hover:text-text",
+            "inline-flex items-center",
             isDrawer ? "min-h-10 py-2" : "",
           )}
         >
-          Help
-        </a>
-        <a
-          href="#"
-          className={cn(
-            "inline-flex items-center transition-colors hover:text-text",
-            isDrawer ? "min-h-10 py-2" : "",
-          )}
-        >
-          Privacy
-        </a>
-        <a
-          href="#"
-          className={cn(
-            "inline-flex items-center transition-colors hover:text-text",
-            isDrawer ? "min-h-10 py-2" : "",
-          )}
-        >
-          Terms
-        </a>
+          © {new Date().getFullYear()} Feedlens.ai
+        </span>
       </footer>
     </div>
   );
