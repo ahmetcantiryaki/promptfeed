@@ -36,7 +36,7 @@ export function SignInModal({ open, onClose, onSignedIn }: Props) {
         <Dialog.Overlay className="fixed inset-0 z-[200] bg-black/65 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="fixed left-1/2 top-1/2 z-[210] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[14px] border bg-surface shadow-2xl outline-none"
+          className="fixed left-1/2 top-1/2 z-[210] flex max-h-[calc(100dvh-2rem)] w-[min(calc(100vw-2rem),420px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-y-auto overscroll-contain rounded-[14px] border bg-surface shadow-2xl outline-none"
         >
           <Dialog.Title className="sr-only">Sign in to Feedlens.ai</Dialog.Title>
           <Header view={view} onBack={() => setView("signin")} onClose={onClose} />
@@ -72,22 +72,22 @@ function Header({
 }) {
   const titles: Record<View, { title: string; sub: string }> = {
     signin: {
-      title: "Sign in to continue",
-      sub: "We'll finish what you started right after.",
+      title: "Sign in",
+      sub: "Continue where you left off.",
     },
     register: {
-      title: "Create your account",
-      sub: "Save and remix prompts in seconds.",
+      title: "Create account",
+      sub: "Save and remix prompts.",
     },
     forgot: {
-      title: "Reset your password",
-      sub: "We'll email you a reset link.",
+      title: "Reset password",
+      sub: "We'll email you a link.",
     },
   };
   const t = titles[view];
   const showBack = view !== "signin";
   return (
-    <div className="flex items-start justify-between gap-3 border-b px-5 py-3.5">
+    <div className="flex items-start justify-between gap-3 border-b px-4 py-3 sm:px-5 sm:py-3.5">
       <div className="flex min-w-0 items-start gap-2">
         {showBack ? (
           <button
@@ -100,10 +100,12 @@ function Header({
           </button>
         ) : null}
         <div className="min-w-0">
-          <div className="text-[15px] font-semibold tracking-tight">
+          <div className="text-[14px] font-semibold tracking-tight sm:text-[15px]">
             {t.title}
           </div>
-          <div className="mt-0.5 text-[12px] text-text-muted">{t.sub}</div>
+          <div className="mt-0.5 text-[11px] text-text-muted sm:text-[12px]">
+            {t.sub}
+          </div>
         </div>
       </div>
       <button
@@ -156,7 +158,7 @@ function SignInView({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 px-5 py-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2.5 px-4 py-3 sm:gap-3 sm:px-5 sm:py-4">
         <Field
           label="Email"
           type="email"
@@ -247,7 +249,7 @@ function RegisterView({
 
   if (sentTo) {
     return (
-      <div className="flex flex-col items-center gap-3 px-5 py-6 text-center">
+      <div className="flex flex-col items-center gap-3 px-4 py-5 text-center sm:px-5 sm:py-6">
         <CheckCircle2 className="h-10 w-10 text-text" strokeWidth={1.6} />
         <div className="text-[15px] font-semibold text-text">
           Check your email
@@ -269,7 +271,7 @@ function RegisterView({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 px-5 py-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2.5 px-4 py-3 sm:gap-3 sm:px-5 sm:py-4">
         <Field
           label="Email"
           type="email"
@@ -345,7 +347,7 @@ function ForgotView({ onSignIn }: { onSignIn: () => void }) {
 
   if (sent) {
     return (
-      <div className="flex flex-col items-center gap-3 px-5 py-6 text-center">
+      <div className="flex flex-col items-center gap-3 px-4 py-5 text-center sm:px-5 sm:py-6">
         <CheckCircle2 className="h-10 w-10 text-text" strokeWidth={1.6} />
         <div className="text-[15px] font-semibold text-text">
           Check your email
@@ -365,7 +367,7 @@ function ForgotView({ onSignIn }: { onSignIn: () => void }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 px-5 py-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2.5 px-4 py-3 sm:gap-3 sm:px-5 sm:py-4">
       <Field
         label="Email"
         type="email"
@@ -400,7 +402,7 @@ function FooterSwap({
   onAction: () => void;
 }) {
   return (
-    <div className="border-t bg-surface-2/40 px-5 py-3 text-center text-[12px] text-text-muted">
+    <div className="border-t bg-surface-2/40 px-4 py-2.5 text-center text-[12px] text-text-muted sm:px-5 sm:py-3">
       {prompt}{" "}
       <button
         type="button"
