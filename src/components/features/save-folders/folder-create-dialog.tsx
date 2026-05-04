@@ -63,7 +63,7 @@ export function FolderCreateDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] bg-black/65 backdrop-blur-sm" />
         <Dialog.Content
-          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
+          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] flex max-h-[100dvh] w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
           aria-describedby="folder-create-desc"
           onEscapeKeyDown={(e) => {
             if (forced) e.preventDefault();
@@ -111,7 +111,7 @@ export function FolderCreateDialog({
               <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-label">
                 Folder name
               </label>
-              <div className="flex items-center gap-2 rounded-[10px] border bg-surface px-3 py-2.5 focus-within:border-border-strong">
+              <div className="flex min-h-10 items-center gap-2 rounded-[10px] border bg-surface px-3 py-2.5 focus-within:border-border-strong">
                 <Folder
                   className="h-4 w-4 shrink-0 text-text-subtle"
                   strokeWidth={1.8}

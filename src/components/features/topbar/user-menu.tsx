@@ -45,7 +45,7 @@ export function UserMenu({
           <button
             type="button"
             aria-label="Account menu"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors hover:bg-hover"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors hover:bg-hover sm:h-9 sm:w-9"
             style={{ padding: 0 }}
           >
             <UserAvatar

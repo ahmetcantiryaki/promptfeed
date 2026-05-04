@@ -449,7 +449,7 @@ function AddDialog({ kind, onClose }: { kind: Kind | null; onClose: () => void }
                 label="Or pick a preset glyph"
                 hint="Use one of the built-in icons. Picking a preset clears the URL and the badge falls back to its built-in glyph (slug must match)."
               >
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 md:grid-cols-10">
                   {presets.map((p) => (
                     <button
                       key={p.slug}

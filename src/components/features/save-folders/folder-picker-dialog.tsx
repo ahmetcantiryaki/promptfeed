@@ -45,7 +45,7 @@ export function FolderPickerDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] bg-black/65 backdrop-blur-sm" />
         <Dialog.Content
-          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] flex max-h-[80vh] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
+          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] flex max-h-[80dvh] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
           aria-describedby="folder-picker-desc"
         >
           <div className="flex items-start justify-between gap-3 border-b px-5 py-4">

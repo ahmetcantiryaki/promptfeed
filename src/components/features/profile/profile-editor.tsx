@@ -273,16 +273,16 @@ export function ProfileEditor({
       </div>
 
       {/* Footer row inside the editor */}
-      <div className="flex items-center justify-between gap-3 border-t pt-4">
+      <div className="flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-[11px] text-text-subtle">
           {dirty ? "Unsaved changes" : "All changes saved"}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
           {secondaryAction ? (
             <button
               type="button"
               onClick={secondaryAction.onClick}
-              className="rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+              className="inline-flex w-full min-h-11 items-center justify-center rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text sm:w-auto sm:min-h-10"
             >
               {secondaryAction.label}
             </button>
@@ -291,7 +291,7 @@ export function ProfileEditor({
             type="button"
             onClick={save}
             disabled={saving || !dirty}
-            className="inline-flex items-center gap-1.5 rounded-[10px] border border-accent bg-accent px-4 py-2 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex w-full min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-accent bg-accent px-4 py-2 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-h-10"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -395,16 +395,16 @@ function SocialRow({
     .replace(/^https?:\/\//, "")
     .replace(/\/$/, "/");
   return (
-    <div className="flex items-center gap-2 rounded-[10px] border bg-surface p-2 transition-colors focus-within:border-border-strong focus-within:ring-2 focus-within:ring-accent/30">
+    <div className="flex flex-wrap items-center gap-2 rounded-[10px] border bg-surface p-2 transition-colors focus-within:border-border-strong focus-within:ring-2 focus-within:ring-accent/30">
       <PlatformBadge platform={platform} size={26} rounded={7} />
-      <div className="flex min-w-0 flex-1 items-center gap-1">
-        <span className="hidden shrink-0 text-[11px] text-text-subtle md:inline">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+        <span className="inline shrink-0 text-[11px] text-text-subtle md:inline">
           {prefix}
         </span>
         <input
           value={value}
           onChange={(e) => onChange(e.target.value.replace(/^@+/, ""))}
-          placeholder={`${prefix}your_handle`}
+          placeholder="your_handle"
           className="min-w-0 flex-1 bg-transparent text-[13px] text-text placeholder:text-text-subtle focus:outline-none"
           autoComplete="off"
         />

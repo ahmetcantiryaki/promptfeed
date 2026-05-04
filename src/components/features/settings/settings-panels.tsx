@@ -252,7 +252,7 @@ export function RecoveryPanel({ email }: { email: string }) {
           type="button"
           onClick={sendReset}
           disabled={loading}
-          className="inline-flex w-fit items-center gap-1.5 rounded-[10px] border bg-surface px-3 py-1.5 text-[12px] font-medium text-text transition-colors hover:bg-hover disabled:opacity-60"
+          className="inline-flex w-fit min-h-9 items-center gap-1.5 rounded-[10px] border bg-surface px-3 py-1.5 text-[13px] font-medium text-text transition-colors hover:bg-hover disabled:opacity-60 sm:text-[12px]"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           Send reset email
@@ -279,7 +279,7 @@ export function RecoveryPanel({ email }: { email: string }) {
           type="button"
           onClick={signOut}
           disabled={!confirmOk || loading}
-          className="inline-flex w-fit items-center gap-1.5 rounded-[10px] border border-red-500 bg-red-500 px-3 py-1.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="inline-flex w-fit min-h-9 items-center gap-1.5 rounded-[10px] border border-red-500 bg-red-500 px-3 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:text-[12px]"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           Sign out everywhere

@@ -1,4 +1,8 @@
 import { Sidebar } from "@/components/features/sidebar/sidebar";
+import {
+  MobileSidebarDrawer,
+  MobileSidebarProvider,
+} from "@/components/features/sidebar/mobile-sidebar-drawer";
 import { Topbar } from "@/components/features/topbar/topbar";
 import { ProfileSetupTrigger } from "@/components/features/profile/profile-setup-trigger";
 import { InteractionsProvider } from "@/components/providers/interactions-provider";
@@ -63,39 +67,47 @@ export default async function MainLayout({
     >
       <FeedFilterProvider>
         <RouteProgressProvider>
-        <div className="grid min-h-screen grid-cols-[248px_1fr]">
-          <Sidebar
-            models={models}
-            platforms={platforms}
-            savedCount={saveData.savedIds.length}
-          />
-          <main className="flex min-w-0 flex-col">
-            <div className="sticky top-0 z-40 bg-surface">
-              <Topbar
+        <MobileSidebarProvider>
+          <div className="grid min-h-[100dvh] grid-cols-1 lg:grid-cols-[248px_1fr]">
+            <Sidebar
+              models={models}
+              platforms={platforms}
+              savedCount={saveData.savedIds.length}
+            />
+            <main className="flex min-w-0 flex-col">
+              <div className="sticky top-0 z-40 bg-surface">
+                <Topbar
+                  user={user}
+                  profile={profile}
+                  avatarConfig={avatarConfig}
+                  avatarUrl={profile?.avatar_url ?? null}
+                  socials={socials}
+                  models={models}
+                  platforms={platforms}
+                  isAdmin={admin}
+                />
+              </div>
+              {children}
+            </main>
+
+            <MobileSidebarDrawer
+              models={models}
+              platforms={platforms}
+              savedCount={saveData.savedIds.length}
+            />
+
+            {user ? (
+              <ProfileSetupTrigger
                 user={user}
                 profile={profile}
-                avatarConfig={avatarConfig}
-                avatarUrl={profile?.avatar_url ?? null}
                 socials={socials}
-                models={models}
-                platforms={platforms}
+                needsSetup={!isProfileComplete(profile)}
                 isAdmin={admin}
               />
-            </div>
-            {children}
-          </main>
-
-          {user ? (
-            <ProfileSetupTrigger
-              user={user}
-              profile={profile}
-              socials={socials}
-              needsSetup={!isProfileComplete(profile)}
-              isAdmin={admin}
-            />
-          ) : null}
-          <SaveFolderModalsHost />
-        </div>
+            ) : null}
+            <SaveFolderModalsHost />
+          </div>
+        </MobileSidebarProvider>
         </RouteProgressProvider>
       </FeedFilterProvider>
       {isBanned ? <BannedScreen /> : null}

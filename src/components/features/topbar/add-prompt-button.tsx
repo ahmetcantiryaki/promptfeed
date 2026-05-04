@@ -32,7 +32,8 @@ export function AddPromptButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-[10px] border border-accent bg-accent px-3.5 py-2 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90"
+        aria-label="Add prompt"
+        className="inline-flex h-10 w-10 items-center justify-center gap-1.5 rounded-[10px] border border-accent bg-accent text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90 sm:h-auto sm:w-auto sm:px-3.5 sm:py-2"
       >
         <ImagePlus className="h-3.5 w-3.5" strokeWidth={2} />
         <span className="hidden sm:inline">Add prompt</span>

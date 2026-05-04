@@ -7,7 +7,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid min-h-screen place-items-center bg-bg px-4 py-10">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-bg px-4 py-10 sm:px-6">
       <div className="w-full max-w-[400px]">
         <Link href="/" aria-label="Feedlens.ai" className="mb-8 flex items-center justify-center">
           <LogoMark height={36} />

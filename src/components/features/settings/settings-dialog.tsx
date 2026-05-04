@@ -66,7 +66,7 @@ export function SettingsDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] bg-black/55 backdrop-blur-sm" />
         <Dialog.Content
-          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] flex max-h-[94vh] min-h-[min(760px,92vh)] w-[min(98vw,1200px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[14px] border bg-surface shadow-2xl"
+          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] flex max-h-[100dvh] min-h-0 w-[min(98vw,1200px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[14px] border bg-surface shadow-2xl"
           aria-describedby="settings-desc"
         >
           <div className="flex items-start justify-between gap-3 border-b px-6 py-4">

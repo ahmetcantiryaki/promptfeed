@@ -443,7 +443,7 @@ export function AddPromptDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm" />
         <Dialog.Content
-          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] flex max-h-[94vh] w-[min(96vw,1120px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
+          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] flex max-h-[100dvh] w-[min(96vw,1120px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
           aria-describedby="add-prompt-desc"
         >
           <div className="flex items-start justify-between gap-3 border-b px-6 py-4">
@@ -534,7 +534,7 @@ export function AddPromptDialog({
                   <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-label">
                     Extra images (optional)
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {extras.map((slot, i) => (
                       <MiniSlot
                         key={i}
@@ -631,11 +631,11 @@ export function AddPromptDialog({
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   maxLength={PROMPT_MAX + 100}
-                  rows={8}
+                  rows={6}
                   spellCheck={!isJson}
                   placeholder={'Cinematic photograph of a cat astronaut…\n\nor JSON, e.g.:\n{ "subject": "cat", "lighting": "rim, cool" }'}
                   className={cn(
-                    "resize-y rounded-[10px] border bg-surface px-3.5 py-2.5 text-[13px] leading-[1.55] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30",
+                    "resize-y rounded-[10px] border bg-surface px-3.5 py-2.5 text-[13px] leading-[1.55] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30 sm:min-h-[212px]",
                     isJson && "font-mono text-[12.5px]",
                   )}
                 />
@@ -749,7 +749,7 @@ function MiniSlot({ slot, onPick, onClear }: MiniSlotProps) {
               e.preventDefault();
               onClear();
             }}
-            className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-red-500"
+            className="absolute right-1 top-1 grid h-8 w-8 place-items-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-red-500 sm:h-6 sm:w-6"
           >
             <Trash2 className="h-3 w-3" strokeWidth={2} />
           </button>
@@ -862,7 +862,7 @@ function AspectDropZone({
                   e.preventDefault();
                   onClear();
                 }}
-                className="grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-red-500"
+                className="grid h-9 w-9 place-items-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-red-500 sm:h-7 sm:w-7"
               >
                 <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
               </button>

@@ -22,6 +22,41 @@ const COL_RESPONSIVE: Record<number, number> = {
   5: 5,
 };
 
+// Tailwind md breakpoint (768px) — at and above this the user-selected column
+// count is honoured. Below md we derive columns from the viewport width.
+const MD_BREAKPOINT = 768;
+const TWO_COL_BREAKPOINT = 420;
+
+function useResponsiveColumnCount(desktopCols: number): number {
+  const [cols, setCols] = useState<number>(() => {
+    if (typeof window === "undefined") return desktopCols;
+    const w = window.innerWidth;
+    if (w < TWO_COL_BREAKPOINT) return 1;
+    if (w < MD_BREAKPOINT) return 2;
+    return desktopCols;
+  });
+
+  useEffect(() => {
+    function compute() {
+      const w = window.innerWidth;
+      if (w < TWO_COL_BREAKPOINT) {
+        setCols(1);
+        return;
+      }
+      if (w < MD_BREAKPOINT) {
+        setCols(2);
+        return;
+      }
+      setCols(desktopCols);
+    }
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, [desktopCols]);
+
+  return cols;
+}
+
 interface Props {
   posts: Post[];
   ownerMap?: OwnerMap;
@@ -46,7 +81,8 @@ export function FeedGrid({
   const { cols: storedCols } = useGridSize();
   const [active, setActive] = useState<Post | null>(null);
 
-  const columnCount = COL_RESPONSIVE[storedCols] ?? 4;
+  const desktopCols = COL_RESPONSIVE[storedCols] ?? 4;
+  const columnCount = useResponsiveColumnCount(desktopCols);
 
   // Map of post.id -> measured rendered height (px). Cards report their
   // height via ResizeObserver after their image loads.
@@ -135,23 +171,15 @@ export function FeedGrid({
 
   return (
     <>
-      {/* Mobile: single column stack */}
-      <div className="block space-y-4 sm:hidden">
-        {posts.map((p) => (
-          <MeasuredCard
-            key={p.id}
-            post={p}
-            owner={p.owner_id && ownerMap ? ownerMap[p.owner_id] ?? null : null}
-            onOpen={() => setActive(p)}
-            onMeasure={reportHeight}
-          />
-        ))}
-      </div>
-
-      {/* Tablet+: balanced flex columns, packed by measured height */}
-      <div className="hidden gap-4 sm:flex">
+      {/* Balanced flex columns, packed by measured height. Column count is
+          derived from viewport width (1 below 420px, 2 below md, then the
+          user-selected count) so we don't need separate mobile markup. */}
+      <div className="flex gap-3 sm:gap-4 lg:gap-5">
         {columns.map((col, i) => (
-          <div key={i} className="flex min-w-0 flex-1 flex-col gap-4">
+          <div
+            key={i}
+            className="flex min-w-0 flex-1 flex-col gap-3 sm:gap-4 lg:gap-5"
+          >
             {col.map(({ post }) => (
               <MeasuredCard
                 key={post.id}

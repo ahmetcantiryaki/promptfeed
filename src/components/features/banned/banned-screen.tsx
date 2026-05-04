@@ -9,7 +9,7 @@ export function BannedScreen() {
       aria-modal="true"
       aria-labelledby="banned-title"
       aria-describedby="banned-desc"
-      className="fixed inset-0 z-[200] grid min-h-screen w-screen place-items-center overflow-y-auto bg-black/85 px-6 py-12 backdrop-blur-md"
+      className="fixed inset-0 z-[200] grid min-h-[100dvh] w-screen place-items-center overflow-y-auto bg-black/85 px-6 py-12 backdrop-blur-md"
     >
       <div className="w-full max-w-[460px] overflow-hidden rounded-[18px] border border-red-500/30 bg-surface shadow-2xl">
         <div className="flex flex-col items-center gap-3 border-b border-red-500/20 bg-red-500/5 px-6 py-7 text-center">
@@ -53,7 +53,7 @@ export function BannedScreen() {
           <form action="/auth/signout" method="post">
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] border bg-surface px-4 py-2 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+              className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[12px] border bg-surface px-4 py-2.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
             >
               <LogOut className="h-3.5 w-3.5" strokeWidth={1.8} />
               Sign out

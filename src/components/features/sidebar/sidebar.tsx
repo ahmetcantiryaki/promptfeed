@@ -18,11 +18,16 @@ function OtherBadge({ size = 20 }: { size?: number }) {
 }
 
 export type SidebarRoute = "discover" | "saved" | null;
+export type SidebarVariant = "rail" | "drawer";
 
 interface SidebarProps {
   models: Model[];
   platforms: Platform[];
   savedCount?: number;
+}
+
+interface SidebarBodyProps extends SidebarProps {
+  variant?: SidebarVariant;
 }
 
 function deriveActiveRoute(
@@ -69,18 +74,44 @@ const MAIN_NAV: NavEntry[] = [
   },
 ];
 
-export function Sidebar({
+/**
+ * Static desktop sidebar rail (≥lg). Below lg the drawer renders
+ * <SidebarBody variant="drawer"> instead.
+ */
+export function Sidebar({ models, platforms, savedCount }: SidebarProps) {
+  return (
+    <aside className="sticky top-0 hidden h-[100dvh] w-[248px] shrink-0 overflow-hidden border-r bg-surface lg:block">
+      <SidebarBody
+        models={models}
+        platforms={platforms}
+        savedCount={savedCount}
+        variant="rail"
+      />
+    </aside>
+  );
+}
+
+export function SidebarBody({
   models,
   platforms,
   savedCount,
-}: SidebarProps) {
+  variant = "rail",
+}: SidebarBodyProps) {
   const pathname = usePathname();
   const { state, setFilter } = useFeedFilter();
   const activeRoute = deriveActiveRoute(pathname ?? "/", state);
   const isHomePath = (pathname ?? "/") === "/";
+  const isDrawer = variant === "drawer";
+
+  // Both rail and drawer own their own padding and vertical scroll so the
+  // body component is fully self-contained.
+  const containerClass =
+    "flex h-full min-h-0 flex-col gap-4 overflow-y-auto px-3 py-4";
+
+  const itemPaddingY = isDrawer ? "py-2.5" : "py-[7px]";
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[248px] shrink-0 flex-col gap-4 overflow-hidden border-r bg-surface px-3 py-4">
+    <div className={containerClass}>
       <Link
         href="/"
         aria-label="Feedlens.ai"
@@ -101,7 +132,8 @@ export function Sidebar({
               active={active}
               onSelect={() => setFilter(patch)}
               className={cn(
-                "flex items-center gap-2.5 rounded-[8px] px-2.5 py-[7px] text-[14px] transition-colors",
+                "flex items-center gap-2.5 rounded-[8px] px-2.5 text-[14px] transition-colors",
+                itemPaddingY,
                 active
                   ? "bg-surface-2 font-medium text-text"
                   : "text-text-muted hover:bg-hover hover:text-text",
@@ -127,6 +159,7 @@ export function Sidebar({
         }))}
         activeSlug={state.view === "feed" ? state.model : undefined}
         isHomePath={isHomePath}
+        itemPaddingY={itemPaddingY}
         onPick={(slug) =>
           setFilter({
             view: "feed",
@@ -139,6 +172,7 @@ export function Sidebar({
         platforms={platforms}
         activeSlug={state.view === "feed" ? state.platform : undefined}
         isHomePath={isHomePath}
+        itemPaddingY={itemPaddingY}
         onPick={(slug) =>
           setFilter({
             view: "feed",
@@ -147,12 +181,41 @@ export function Sidebar({
         }
       />
 
-      <footer className="mt-auto flex items-center gap-3 border-t px-2 pt-2.5 text-[11px] text-text-subtle">
-        <a href="#" className="hover:text-text">Help</a>
-        <a href="#" className="hover:text-text">Privacy</a>
-        <a href="#" className="hover:text-text">Terms</a>
+      <footer
+        className={cn(
+          "mt-auto flex items-center gap-3 border-t px-2 text-[12px] text-text-subtle",
+          isDrawer ? "pt-3" : "pt-2.5",
+        )}
+      >
+        <a
+          href="#"
+          className={cn(
+            "inline-flex items-center transition-colors hover:text-text",
+            isDrawer ? "min-h-10 py-2" : "",
+          )}
+        >
+          Help
+        </a>
+        <a
+          href="#"
+          className={cn(
+            "inline-flex items-center transition-colors hover:text-text",
+            isDrawer ? "min-h-10 py-2" : "",
+          )}
+        >
+          Privacy
+        </a>
+        <a
+          href="#"
+          className={cn(
+            "inline-flex items-center transition-colors hover:text-text",
+            isDrawer ? "min-h-10 py-2" : "",
+          )}
+        >
+          Terms
+        </a>
       </footer>
-    </aside>
+    </div>
   );
 }
 
@@ -212,11 +275,13 @@ function ModelsList({
   items,
   activeSlug,
   isHomePath,
+  itemPaddingY,
   onPick,
 }: {
   items: ModelItem[];
   activeSlug?: string;
   isHomePath: boolean;
+  itemPaddingY: string;
   onPick: (slug: string) => void;
 }) {
   return (
@@ -235,7 +300,10 @@ function ModelsList({
             active={active}
             onSelect={() => onPick(it.slug)}
             data-active={active ? "true" : undefined}
-            className="flex items-center gap-2.5 rounded-[6px] px-2.5 py-[7px] text-[14px] font-medium text-text-subtle transition-colors hover:bg-hover hover:text-text data-[active=true]:bg-surface-2 data-[active=true]:font-semibold data-[active=true]:text-text"
+            className={cn(
+              "flex items-center gap-2.5 rounded-[6px] px-2.5 text-[14px] font-medium text-text-subtle transition-colors hover:bg-hover hover:text-text data-[active=true]:bg-surface-2 data-[active=true]:font-semibold data-[active=true]:text-text",
+              itemPaddingY,
+            )}
           >
             {it.slug === "other" ? (
               <OtherBadge size={20} />
@@ -257,11 +325,13 @@ function PlatformsList({
   platforms,
   activeSlug,
   isHomePath,
+  itemPaddingY,
   onPick,
 }: {
   platforms: Platform[];
   activeSlug?: string;
   isHomePath: boolean;
+  itemPaddingY: string;
   onPick: (slug: string) => void;
 }) {
   const list: Platform[] = platforms;
@@ -281,7 +351,10 @@ function PlatformsList({
             active={active}
             onSelect={() => onPick(p.slug)}
             data-active={active ? "true" : undefined}
-            className="flex items-center gap-2.5 rounded-[6px] px-2.5 py-[7px] text-[14px] font-medium text-text-subtle transition-colors hover:bg-hover hover:text-text data-[active=true]:bg-surface-2 data-[active=true]:font-semibold data-[active=true]:text-text"
+            className={cn(
+              "flex items-center gap-2.5 rounded-[6px] px-2.5 text-[14px] font-medium text-text-subtle transition-colors hover:bg-hover hover:text-text data-[active=true]:bg-surface-2 data-[active=true]:font-semibold data-[active=true]:text-text",
+              itemPaddingY,
+            )}
           >
             {isPlatformSlug(p.slug) ? (
               <PlatformBadge platform={p.slug} size={20} />

@@ -18,10 +18,10 @@ const CREATORS: Creator[] = [
 export function CreditsStrip() {
   return (
     <div className="flex min-w-0 items-center gap-2 text-[13px]">
-      <span className="shrink-0 font-semibold tracking-tight text-text">
+      <span className="hidden shrink-0 font-semibold tracking-tight text-text sm:inline">
         Created by
       </span>
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-1.5 truncate">
         {CREATORS.map((c, i) => (
           <Fragment key={c.handle}>
             <CreditLink {...c} />
@@ -42,7 +42,7 @@ function CreditLink({ handle, url }: Creator) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`Open ${handle} on X`}
-      className="group relative inline-block text-[13px] font-medium text-text-muted transition-colors duration-200 ease-out hover:text-text"
+      className="group relative inline-block max-w-[40vw] truncate text-[13px] font-medium text-text-muted transition-colors duration-200 ease-out hover:text-text sm:max-w-none"
     >
       <span className="relative">
         {handle}

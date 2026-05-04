@@ -73,7 +73,7 @@ export function FilterDropdown({
       </button>
 
       {open ? (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-20 min-w-[200px] max-w-[280px] overflow-hidden rounded-[10px] border bg-surface shadow-surface">
+        <div className="absolute left-0 right-auto top-[calc(100%+4px)] z-20 min-w-[200px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[10px] border bg-surface shadow-surface sm:left-0 sm:max-w-[280px]">
           <button
             type="button"
             onClick={() => apply(undefined)}
@@ -87,7 +87,7 @@ export function FilterDropdown({
             <span className="flex-1">{allLabel}</span>
           </button>
           <div className="border-t" />
-          <div className="max-h-[300px] overflow-y-auto">
+          <div className="max-h-[60vh] overflow-y-auto">
             {options.map((o) => {
               const isActive = o.value === activeValue;
               return (

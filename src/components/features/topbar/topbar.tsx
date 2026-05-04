@@ -7,6 +7,7 @@ import type {
   Profile,
   SocialAccount,
 } from "@/types/domain";
+import { MobileSidebarTrigger } from "@/components/features/sidebar/mobile-sidebar-drawer";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
 import { AddPromptButton } from "./add-prompt-button";
@@ -34,7 +35,8 @@ export function Topbar({
   isAdmin = false,
 }: Props) {
   return (
-    <header className="flex h-[60px] shrink-0 items-center gap-3 border-b bg-surface px-6">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-surface px-3 sm:h-[60px] sm:gap-3 sm:px-6">
+      <MobileSidebarTrigger />
       <CreditsStrip />
 
       <div className="flex-1" />
@@ -67,7 +69,7 @@ export function Topbar({
           <ThemeToggle />
           <Link
             href="/login"
-            className="inline-flex items-center gap-1.5 rounded-[10px] border border-accent bg-accent px-4 py-2 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90"
+            className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-accent bg-accent px-3.5 text-[13px] font-semibold text-accent-fg transition-opacity hover:opacity-90 sm:h-auto sm:px-4 sm:py-2"
           >
             Sign in
           </Link>

@@ -70,7 +70,7 @@ export function PrettySelect<T extends string = string>({
           position="popper"
           sideOffset={6}
           className={cn(
-            "z-[200] max-h-[320px] min-w-[var(--radix-select-trigger-width)] overflow-hidden",
+            "z-[200] max-h-[60dvh] min-w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-1rem)] overflow-hidden",
             "rounded-[10px] border bg-surface shadow-2xl",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
           )}

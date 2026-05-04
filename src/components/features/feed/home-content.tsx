@@ -196,7 +196,7 @@ export function HomeContent({
         </div>
       ) : null}
 
-      <div className="px-7 pb-10 pt-6">
+      <div className="px-3 pb-10 pt-6 sm:px-5 lg:px-7">
         {state.view === "saved" ? (
           <SavedHeader detail={folderDetail} folders={folders ?? []} />
         ) : null}

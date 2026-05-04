@@ -27,7 +27,7 @@ export function LazyImage({
   className,
   imgClassName,
   aspectRatio,
-  minHeight = 280,
+  minHeight = 200,
   loading = "lazy",
   draggable,
   onLoadComplete,

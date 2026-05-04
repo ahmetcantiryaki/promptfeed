@@ -308,7 +308,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-md" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-[90] flex max-h-[92vh] w-[min(96vw,820px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[14px] border bg-surface shadow-2xl outline-none"
+          className="fixed left-1/2 top-1/2 z-[90] flex max-h-[100dvh] w-[min(96vw,820px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[14px] border bg-surface shadow-2xl outline-none"
           aria-describedby={undefined}
         >
           <div className="flex items-center justify-between border-b px-5 py-3.5">
@@ -429,7 +429,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
               />
             </Field>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Model">
                 <PrettySelect
                   value={modelSlug}
@@ -457,7 +457,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
               />
             </Field>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Creator URL">
                 <input
                   value={extUrl}

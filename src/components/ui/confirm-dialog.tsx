@@ -51,7 +51,7 @@ export function ConfirmDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[90] bg-black/55 backdrop-blur-sm" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-[100] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[14px] border bg-surface p-6 shadow-2xl outline-none"
+          className="fixed left-1/2 top-1/2 z-[100] flex max-h-[100dvh] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-y-auto rounded-[14px] border bg-surface p-6 shadow-2xl outline-none"
           aria-describedby={description ? "confirm-desc" : undefined}
         >
           <div className="flex items-start gap-3">
@@ -81,12 +81,12 @@ export function ConfirmDialog({
               ) : null}
             </div>
           </div>
-          <div className="mt-5 flex justify-end gap-2">
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
               disabled={busy}
-              className="rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-50"
+              className="w-full rounded-[10px] border bg-surface px-3.5 py-2 text-[13px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-50 sm:w-auto"
             >
               {cancelLabel}
             </button>
@@ -95,7 +95,7 @@ export function ConfirmDialog({
               onClick={handleConfirm}
               disabled={busy}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-[10px] border px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60",
+                "inline-flex w-full items-center justify-center gap-1.5 rounded-[10px] border px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 sm:w-auto",
                 tone === "danger"
                   ? "border-red-500 bg-red-500"
                   : "border-accent bg-accent text-accent-fg",

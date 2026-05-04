@@ -70,7 +70,7 @@ export function PostCardMenu({ post, tone = "light" }: Props) {
             aria-label="More"
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "grid h-8 w-8 place-items-center rounded-full backdrop-blur transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+              "grid h-9 w-9 place-items-center rounded-full backdrop-blur transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:h-8 sm:w-8",
               tone === "dark"
                 ? "bg-black/55 text-white hover:bg-black/75"
                 : "text-text-muted hover:bg-hover hover:text-text",

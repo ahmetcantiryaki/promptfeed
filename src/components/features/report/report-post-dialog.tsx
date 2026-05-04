@@ -103,7 +103,7 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/65 backdrop-blur-sm" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-[90] flex max-h-[92vh] w-[min(92vw,460px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
+          className="fixed left-1/2 top-1/2 z-[90] flex max-h-[92dvh] w-[min(92vw,460px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
           aria-describedby="report-desc"
         >
           <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
@@ -147,7 +147,7 @@ export function ReportPostDialog({ open, onOpenChange, postId }: Props) {
                     <label
                       key={opt.value}
                       className={cn(
-                        "flex cursor-pointer items-start gap-2.5 rounded-[10px] border px-3 py-2 transition-colors",
+                        "flex min-h-10 cursor-pointer items-start gap-2.5 rounded-[10px] border px-3 py-2 transition-colors",
                         active
                           ? "border-accent/60 bg-accent/5"
                           : "border-border bg-surface hover:bg-hover",

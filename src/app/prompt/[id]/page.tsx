@@ -121,7 +121,7 @@ export default async function PromptPage({ params }: PageProps) {
       initialFolders={folders}
       initialSaveByPostId={saves.mapping}
     >
-      <div className="mx-auto flex min-h-screen w-full max-w-[1080px] flex-col gap-6 px-5 py-8">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[1080px] flex-col gap-6 px-4 py-6 sm:px-5 sm:py-8">
         <header className="flex items-center justify-between">
           <Link
             href="/"

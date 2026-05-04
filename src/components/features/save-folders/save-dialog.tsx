@@ -71,7 +71,7 @@ export function SaveDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] bg-black/65 backdrop-blur-sm" />
         <Dialog.Content
-          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
+          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] flex max-h-[100dvh] w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border bg-surface shadow-2xl"
           aria-describedby="save-dialog-desc"
         >
           <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
@@ -130,7 +130,7 @@ export function SaveDialog({
             </div>
           ) : null}
 
-          <div className="flex items-center gap-2 border-t bg-surface px-3 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-t bg-surface px-3 py-3">
             <Popover.Root open={popoverOpen} onOpenChange={setPopoverOpen}>
               <Popover.Trigger asChild>
                 <button
@@ -156,7 +156,7 @@ export function SaveDialog({
                   align="start"
                   side="bottom"
                   sideOffset={6}
-                  className="z-[80] flex max-h-[280px] w-[var(--radix-popover-trigger-width)] flex-col overflow-hidden rounded-[12px] border bg-surface shadow-2xl"
+                  className="z-[80] flex max-h-[60dvh] w-[var(--radix-popover-trigger-width)] min-w-[260px] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[12px] border bg-surface shadow-2xl sm:max-h-[280px]"
                 >
                   <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-1.5">
                     {folders.map((f) => {

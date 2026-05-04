@@ -79,6 +79,7 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
         <LazyImage
           src={post.thumbnail_url ?? post.media_url}
           alt={post.prompt.slice(0, 80)}
+          minHeight={200}
           imgClassName="transition-transform duration-500 ease-out group-hover:scale-[1.04]"
         />
       )}
@@ -86,12 +87,12 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
       {/* Top-left compact badge — Remix OR +N images (never both) */}
       <div className="pointer-events-none absolute left-2 top-2 z-30 flex items-center gap-1.5">
         {isRemix ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur">
+          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur">
             <Wand2 className="h-3 w-3" strokeWidth={2} />
             Remix
           </span>
         ) : hasExtras ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur">
+          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur">
             <Images className="h-3 w-3" strokeWidth={2} />
             {allImages.length}
           </span>
@@ -108,8 +109,8 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
         />
       ) : null}
 
-      {/* Bottom hover bar — Like / Save / 3-dot  (share is inside the menu) */}
-      <div className="pf-card-bar absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-3 pt-10 text-white">
+      {/* Bottom action bar — always visible <md (touch); slides on hover/focus md+. */}
+      <div className="pf-card-bar absolute inset-x-0 bottom-0 z-20 max-md:!translate-y-0 max-md:!opacity-100 max-md:!pointer-events-auto bg-gradient-to-t from-black/90 via-black/55 to-transparent px-2.5 pb-2.5 pt-9 text-white sm:px-3 sm:pb-3 sm:pt-10">
         <div className="flex items-center gap-2.5">
           <div className="min-w-0 flex-1">
             <div className="truncate text-[12px] font-semibold leading-tight">
@@ -127,7 +128,7 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
             </div>
           </div>
 
-          <div className="pf-card-actions flex shrink-0 items-center gap-1.5">
+          <div className="pf-card-actions flex shrink-0 items-center gap-1.5 max-md:!pointer-events-auto">
             <ActionBtn
               label={isLiked ? "Unlike" : "Like"}
               active={isLiked}
@@ -193,6 +194,7 @@ function AutoSlider({ images, alt }: { images: string[]; alt: string }) {
       <LazyImage
         src={first ?? ""}
         alt={alt}
+        minHeight={200}
         imgClassName={cn(
           "transition-all duration-700 ease-out group-hover:scale-[1.04]",
           images.length > 1 && idx !== 0 && "opacity-0",
@@ -243,7 +245,7 @@ function ViewChip({ count }: { count: number }) {
   return (
     <span
       aria-label={`Views: ${count}`}
-      className="inline-flex h-8 items-center gap-1 rounded-full bg-black/55 px-2.5 text-[11px] font-semibold tabular-nums text-white backdrop-blur-md"
+      className="inline-flex h-9 items-center gap-1 rounded-full bg-black/55 px-2.5 text-[11px] font-semibold tabular-nums text-white backdrop-blur-md sm:h-8"
     >
       <BarChart3 className="h-4 w-4" strokeWidth={2} />
       {formatCount(count)}
@@ -260,7 +262,7 @@ function SourceBtn({ url }: { url: string | null }) {
       rel="noopener noreferrer"
       aria-label="Open source in new tab"
       onClick={(e) => e.stopPropagation()}
-      className="inline-flex h-8 items-center gap-1 rounded-full bg-black/55 px-2 text-white backdrop-blur-md transition-all hover:bg-black/75 active:scale-95"
+      className="inline-flex h-9 items-center gap-1 rounded-full bg-black/55 px-2 text-white backdrop-blur-md transition-all hover:bg-black/75 active:scale-95 sm:h-8"
     >
       <ExternalLink className="h-4 w-4" strokeWidth={2} />
     </a>
@@ -285,7 +287,7 @@ function ActionBtn({
         onClick();
       }}
       className={cn(
-        "inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold tabular-nums backdrop-blur-md transition-all active:scale-95",
+        "inline-flex h-9 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold tabular-nums backdrop-blur-md transition-all active:scale-95 sm:h-8",
         active ? activeClass : "bg-black/55 text-white hover:bg-black/75",
       )}
     >

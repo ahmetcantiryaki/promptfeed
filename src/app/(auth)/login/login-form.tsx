@@ -61,7 +61,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-accent bg-accent px-4 py-2.5 text-[14px] font-semibold text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-60"
+        className="mt-1 inline-flex w-full min-h-11 items-center justify-center gap-1.5 rounded-[10px] border border-accent bg-accent px-4 py-2.5 text-[14px] font-semibold text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-60 sm:w-auto sm:min-h-10"
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Sign in
@@ -97,7 +97,7 @@ function Field({
         minLength={minLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-[10px] border bg-surface px-3.5 py-2.5 text-[14px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none"
+        className="min-h-11 rounded-[10px] border bg-surface px-3.5 py-2.5 text-[14px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none sm:min-h-10"
       />
     </label>
   );

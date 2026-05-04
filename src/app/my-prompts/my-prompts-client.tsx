@@ -61,7 +61,7 @@ export function MyPromptsClient({ posts, stats }: Props) {
           return (
             <li
               key={post.id}
-              className="flex items-start gap-3 rounded-[12px] border bg-surface p-3 transition-colors hover:bg-hover/40 sm:items-stretch"
+              className="flex flex-col items-stretch gap-3 rounded-[12px] border bg-surface p-3 transition-colors hover:bg-hover/40 sm:flex-row sm:items-stretch"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -91,12 +91,12 @@ export function MyPromptsClient({ posts, stats }: Props) {
                   </Stat>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center">
+              <div className="flex shrink-0 items-center justify-end">
                 <button
                   type="button"
                   onClick={() => setConfirmPost(post)}
                   aria-label="Delete prompt"
-                  className="grid h-9 w-9 place-items-center rounded-[8px] text-text-muted transition-colors hover:bg-red-500/10 hover:text-red-500"
+                  className="grid h-10 w-10 place-items-center rounded-[8px] text-text-muted transition-colors hover:bg-red-500/10 hover:text-red-500 sm:h-9 sm:w-9"
                 >
                   <Trash2 className="h-4 w-4" strokeWidth={1.8} />
                 </button>

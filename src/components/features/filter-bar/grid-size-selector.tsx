@@ -9,7 +9,7 @@ export function GridSizeSelector() {
   const { cols, setCols } = useGridSize();
 
   return (
-    <div className="inline-flex overflow-hidden rounded-[10px] border">
+    <div className="hidden overflow-hidden rounded-[10px] border md:inline-flex">
       {OPTIONS.map((n, i) => (
         <button
           key={n}

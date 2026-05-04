@@ -125,6 +125,28 @@
   animation: pf-content-out 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ---------- Mobile sidebar drawer (slide from left) ---------- */
+@keyframes pf-drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes pf-drawer-out {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+.pf-drawer-overlay[data-state="open"] {
+  animation: pf-fade-in 180ms ease-out;
+}
+.pf-drawer-overlay[data-state="closed"] {
+  animation: pf-fade-out 160ms ease-in;
+}
+.pf-drawer-content[data-state="open"] {
+  animation: pf-drawer-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pf-drawer-content[data-state="closed"] {
+  animation: pf-drawer-out 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* ---------- Card hover bar slide-in ---------- */
 .pf-card-bar {
   transform: translateY(10%);

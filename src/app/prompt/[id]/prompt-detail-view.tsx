@@ -92,7 +92,7 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
   }
 
   return (
-    <article className="grid h-[calc(100vh-96px)] min-h-[560px] grid-cols-1 overflow-hidden rounded-[14px] border bg-black md:grid-cols-[70%_30%]">
+    <article className="grid h-[calc(100dvh-96px)] min-h-[400px] grid-cols-1 overflow-hidden rounded-[14px] border bg-black lg:min-h-[560px] lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
       <div className="relative flex items-center justify-center overflow-hidden bg-black">
         {isRemix && post.source_image_url ? (
           <RemixCurtain
@@ -150,7 +150,10 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
               ) : null}
             </div>
             {isJson ? (
-              <pre className="min-h-0 flex-1 overflow-auto rounded-[10px] border bg-surface-2 p-3 font-mono text-[12px] leading-[1.55] text-text">
+              <pre
+                className="min-h-0 flex-1 overflow-auto rounded-[10px] border bg-surface-2 p-3 font-mono text-[12px] leading-[1.55] text-text"
+                style={{ WebkitOverflowScrolling: "touch" }}
+              >
                 {JSON.stringify(parsedJson, null, 2)}
               </pre>
             ) : (
@@ -218,7 +221,7 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
               type="button"
               onClick={copyLink}
               aria-label="Copy link"
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border bg-surface px-3 text-[12px] font-semibold text-text-muted transition-colors hover:bg-hover hover:text-text active:scale-95"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border bg-surface px-3 text-[12px] font-semibold text-text-muted transition-colors hover:bg-hover hover:text-text active:scale-95 sm:h-9"
             >
               <Share2 className="h-4 w-4" strokeWidth={2} />
             </button>
@@ -366,7 +369,7 @@ function ToggleStat({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold tabular-nums transition-all active:scale-95",
+        "inline-flex h-10 items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold tabular-nums transition-all active:scale-95 sm:h-9",
         active
           ? `border-transparent ${activeClass}`
           : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
@@ -390,7 +393,7 @@ function StaticStat({
   return (
     <span
       aria-label={`${label}: ${count}`}
-      className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-[12px] font-semibold tabular-nums text-text-muted"
+      className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-[12px] font-semibold tabular-nums text-text-muted sm:h-9"
     >
       {icon}
       <span>{formatCount(count)}</span>
