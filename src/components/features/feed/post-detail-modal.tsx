@@ -30,11 +30,20 @@ import { DetailImageSlider } from "./detail-image-slider";
 interface Props {
   post: Post | null;
   owner: OwnerInfo | null;
+  /** Viewport-relative click origin (px). Drives the mobile scale-from-card
+   *  open animation via CSS variables (--pf-origin-x/y). */
+  origin?: { x: number; y: number };
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
+export function PostDetailModal({
+  post,
+  owner,
+  origin,
+  open,
+  onOpenChange,
+}: Props) {
   const { liked, saved, toggleLike, toggleSave } = useInteractions();
   const isLiked = post ? liked.has(post.id) : false;
   const isSaved = post ? saved.has(post.id) : false;
@@ -113,9 +122,17 @@ export function PostDetailModal({ post, owner, open, onOpenChange }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] bg-black/85 backdrop-blur-xl" />
+        <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] h-[100dvh] bg-black/85 backdrop-blur-xl" />
         <Dialog.Content
-          className="pf-modal-content fixed inset-0 z-[70] flex flex-col overflow-y-auto overflow-x-hidden bg-bg outline-none md:left-1/2 md:top-1/2 md:inset-auto md:grid md:h-[96vh] md:w-[96vw] md:max-w-[1440px] md:-translate-x-1/2 md:-translate-y-1/2 md:grid-cols-[70%_30%] md:overflow-hidden md:rounded-[16px]"
+          className="pf-modal-content fixed inset-x-0 top-0 z-[70] flex h-[100dvh] flex-col overflow-y-auto overflow-x-hidden bg-bg pb-[env(safe-area-inset-bottom)] outline-none md:inset-auto md:left-1/2 md:top-1/2 md:grid md:h-[96vh] md:w-[96vw] md:max-w-[1440px] md:-translate-x-1/2 md:-translate-y-1/2 md:grid-cols-[70%_30%] md:overflow-hidden md:rounded-[16px] md:pb-0"
+          style={
+            origin
+              ? ({
+                  ["--pf-origin-x"]: `${origin.x}px`,
+                  ["--pf-origin-y"]: `${origin.y}px`,
+                } as React.CSSProperties)
+              : undefined
+          }
           aria-describedby={undefined}
         >
           <Dialog.Title className="sr-only">

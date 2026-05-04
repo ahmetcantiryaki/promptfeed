@@ -71,7 +71,10 @@ export function FeedGrid({
   loadingMore = false,
 }: Props) {
   const { cols: storedCols, mobileCols } = useGridSize();
-  const [active, setActive] = useState<Post | null>(null);
+  const [active, setActive] = useState<{
+    post: Post;
+    origin?: { x: number; y: number };
+  } | null>(null);
 
   const desktopCols = COL_RESPONSIVE[storedCols] ?? 4;
   const columnCount = useResponsiveColumnCount(desktopCols, mobileCols);
@@ -158,8 +161,15 @@ export function FeedGrid({
     );
   }
 
+  const activePost = active?.post ?? null;
   const activeOwner =
-    active?.owner_id && ownerMap ? ownerMap[active.owner_id] ?? null : null;
+    activePost?.owner_id && ownerMap
+      ? ownerMap[activePost.owner_id] ?? null
+      : null;
+
+  function openWithOrigin(p: Post) {
+    return (origin?: { x: number; y: number }) => setActive({ post: p, origin });
+  }
 
   return (
     <>
@@ -181,7 +191,7 @@ export function FeedGrid({
                     ? ownerMap[post.owner_id] ?? null
                     : null
                 }
-                onOpen={() => setActive(post)}
+                onOpen={openWithOrigin(post)}
                 onMeasure={reportHeight}
               />
             ))}
@@ -204,8 +214,9 @@ export function FeedGrid({
       ) : null}
 
       <PostDetailModal
-        post={active}
+        post={activePost}
         owner={activeOwner}
+        origin={active?.origin}
         open={active !== null}
         onOpenChange={(o) => {
           if (!o) setActive(null);
@@ -218,12 +229,27 @@ export function FeedGrid({
 interface MeasuredCardProps {
   post: Post;
   owner: import("@/lib/posts").OwnerInfo | null;
-  onOpen: () => void;
+  onOpen: (origin?: { x: number; y: number }) => void;
   onMeasure: (id: string, h: number) => void;
 }
 
 function MeasuredCard({ post, owner, onOpen, onMeasure }: MeasuredCardProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  // Wrap onOpen so we capture the card's centre as the modal's transform-
+  // origin — the modal then "grows" out of the tapped card on mobile.
+  const handleOpen = useCallback(() => {
+    const node = wrapRef.current;
+    if (!node) {
+      onOpen();
+      return;
+    }
+    const rect = node.getBoundingClientRect();
+    onOpen({
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    });
+  }, [onOpen]);
 
   useLayoutEffect(() => {
     const node = wrapRef.current;
@@ -243,7 +269,7 @@ function MeasuredCard({ post, owner, onOpen, onMeasure }: MeasuredCardProps) {
 
   return (
     <div ref={wrapRef} className="pf-card-in">
-      <PostCard post={post} owner={owner} onOpen={onOpen} />
+      <PostCard post={post} owner={owner} onOpen={handleOpen} />
     </div>
   );
 }

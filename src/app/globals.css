@@ -128,6 +128,29 @@
   animation: pf-content-out 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Mobile (<md): the modal is fixed inset-0 (no translate), so we override
+   the desktop keyframes with a clean scale-from-click-origin pop. The origin
+   is fed in as CSS variables (--pf-origin-x/y) by the caller; if absent we
+   fall back to the screen centre. */
+@keyframes pf-modal-pop-in {
+  from { opacity: 0; transform: scale(0.55); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes pf-modal-pop-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.6); }
+}
+@media (max-width: 767px) {
+  .pf-modal-content[data-state="open"] {
+    transform-origin: var(--pf-origin-x, 50%) var(--pf-origin-y, 50%);
+    animation: pf-modal-pop-in 280ms cubic-bezier(0.18, 0.9, 0.32, 1.08);
+  }
+  .pf-modal-content[data-state="closed"] {
+    transform-origin: var(--pf-origin-x, 50%) var(--pf-origin-y, 50%);
+    animation: pf-modal-pop-out 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
 /* ---------- Mobile sidebar drawer (slide from left) ---------- */
 @keyframes pf-drawer-in {
   from { transform: translateX(-100%); }
