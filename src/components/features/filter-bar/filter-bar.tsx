@@ -64,9 +64,12 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
     [platforms],
   );
 
-  const sortValue = state.sort === "newest" ? undefined : state.sort;
-  const activeCount = [state.model, state.platform, sortValue].filter(Boolean)
-    .length;
+  // Sort is always defined (default "newest" → "Latest"), so we don't hide
+  // it behind an undefined sentinel. activeCount still ignores "newest"
+  // so the Filters badge only ticks up for non-default sorts.
+  const activeCount =
+    [state.model, state.platform].filter(Boolean).length +
+    (state.sort !== "newest" ? 1 : 0);
 
   return (
     <div className="flex items-center gap-2 border-b bg-surface px-3 py-3 sm:px-5 lg:px-7">
@@ -119,8 +122,7 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
           onChange={(v) => setFilter({ platform: v })}
         />
         <FilterDropdown
-          activeValue={sortValue}
-          allLabel="Newest First"
+          activeValue={state.sort}
           options={SORT_OPTIONS}
           onChange={(v) =>
             setFilter({ sort: (v as PostSort | undefined) ?? "newest" })

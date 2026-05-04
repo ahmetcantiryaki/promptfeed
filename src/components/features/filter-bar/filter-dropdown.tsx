@@ -12,9 +12,15 @@ export interface FilterOption {
 
 interface Props {
   activeValue?: string;
-  allLabel: string;
+  /** When set, an "All" row appears at the top of the dropdown that resets
+   *  the value. Omit for selectors where the value is always defined
+   *  (e.g. the sort dropdown — Latest/Oldest/Top, no "all"). */
+  allLabel?: string;
   options: FilterOption[];
   onChange: (next: string | undefined) => void;
+  /** Fallback text for the trigger when no option matches activeValue.
+   *  Defaults to allLabel. */
+  placeholder?: string;
 }
 
 export function FilterDropdown({
@@ -22,6 +28,7 @@ export function FilterDropdown({
   allLabel,
   options,
   onChange,
+  placeholder,
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -53,7 +60,7 @@ export function FilterDropdown({
   }
 
   const active = options.find((o) => o.value === activeValue);
-  const currentLabel = active?.label ?? allLabel;
+  const currentLabel = active?.label ?? allLabel ?? placeholder ?? "";
 
   return (
     <div className="relative" ref={rootRef}>
@@ -74,19 +81,23 @@ export function FilterDropdown({
 
       {open ? (
         <div className="absolute left-0 right-auto top-[calc(100%+4px)] z-20 min-w-[200px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[10px] border bg-surface shadow-surface sm:left-0 sm:max-w-[280px]">
-          <button
-            type="button"
-            onClick={() => apply(undefined)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-text-muted hover:bg-hover hover:text-text"
-          >
-            <span className="w-4">
-              {!activeValue ? (
-                <Check className="h-3.5 w-3.5" strokeWidth={2.2} />
-              ) : null}
-            </span>
-            <span className="flex-1">{allLabel}</span>
-          </button>
-          <div className="border-t" />
+          {allLabel ? (
+            <>
+              <button
+                type="button"
+                onClick={() => apply(undefined)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-text-muted hover:bg-hover hover:text-text"
+              >
+                <span className="w-4">
+                  {!activeValue ? (
+                    <Check className="h-3.5 w-3.5" strokeWidth={2.2} />
+                  ) : null}
+                </span>
+                <span className="flex-1">{allLabel}</span>
+              </button>
+              <div className="border-t" />
+            </>
+          ) : null}
           <div className="max-h-[60vh] overflow-y-auto">
             {options.map((o) => {
               const isActive = o.value === activeValue;
