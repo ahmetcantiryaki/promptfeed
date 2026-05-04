@@ -308,7 +308,8 @@ export function PostDetailModal({
 
                 </div>
 
-                <EditorFooter owner={owner} />
+                {/* Curator footer hidden temporarily — re-enable later. */}
+                {/* <EditorFooter owner={owner} /> */}
               </aside>
             </>
           ) : null}

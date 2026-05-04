@@ -229,7 +229,8 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
 
         </div>
 
-        <EditorFooter owner={owner} fallbackXUrl={ownerXUrl} />
+        {/* Curator footer hidden temporarily — re-enable later. */}
+        {/* <EditorFooter owner={owner} fallbackXUrl={ownerXUrl} /> */}
       </aside>
     </article>
   );
