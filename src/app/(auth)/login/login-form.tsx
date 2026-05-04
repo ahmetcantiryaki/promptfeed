@@ -60,7 +60,7 @@ export function LoginForm() {
         </div>
       ) : null}
       <div className="mt-1 flex flex-col gap-3">
-        <GoogleButton label="Sign in with Google" next="/" />
+        <GoogleButton text="signin_with" next="/" />
         <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-text-subtle">
           <span className="h-px flex-1 bg-border" />
           or

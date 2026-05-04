@@ -175,7 +175,7 @@ function SignInView({
         />
         {error ? <ErrorBox message={error} /> : null}
         <div className="mt-1 flex flex-col gap-3">
-          <GoogleButton label="Sign in with Google" />
+          <GoogleButton text="signin_with" />
           <Divider />
         </div>
         <SubmitButton loading={loading} label="Sign in" />
@@ -292,7 +292,7 @@ function RegisterView({
         </p>
         {error ? <ErrorBox message={error} /> : null}
         <div className="mt-1 flex flex-col gap-3">
-          <GoogleButton label="Sign up with Google" />
+          <GoogleButton text="signup_with" />
           <Divider />
         </div>
         <SubmitButton loading={loading} label="Create account" />
