@@ -10,6 +10,7 @@ import {
   ImagePlus,
   ShieldCheck,
   User as UserIcon,
+  Bookmark,
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import type {
@@ -91,6 +92,15 @@ export function UserMenu({
               </div>
             </div>
             <DropdownMenu.Separator className="my-1 h-px bg-border" />
+            <DropdownMenu.Item asChild>
+              <Link
+                href="/?view=saved"
+                className="flex cursor-pointer items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-[13px] text-text-muted outline-none transition-colors data-[highlighted]:bg-hover data-[highlighted]:text-text"
+              >
+                <Bookmark className="h-3.5 w-3.5" />
+                Saved
+              </Link>
+            </DropdownMenu.Item>
             {isAdmin ? (
               <DropdownMenu.Item asChild>
                 <Link
