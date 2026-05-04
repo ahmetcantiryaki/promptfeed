@@ -61,11 +61,7 @@ export function HomeContent({
   initialFolderDetail,
 }: Props) {
   const { state } = useFeedFilter();
-  const {
-    isAuthed,
-    folders: providerFolders,
-    saveByPostId,
-  } = useInteractions();
+  const { isAuthed } = useInteractions();
   const progress = useRouteProgress();
   const progressRef = useRef(progress);
   progressRef.current = progress;
@@ -88,21 +84,6 @@ export function HomeContent({
   const loadMoreInFlight = useRef(false);
   const requestId = useRef(0);
 
-  // Synthetic folder summaries derived from data already loaded in
-  // InteractionsProvider — lets us paint the saved view *instantly* on click
-  // (no spinner) while the network call enriches with cover thumbnails.
-  const syntheticFolders = useMemo<SaveFolderSummary[]>(() => {
-    const counts = new Map<string, number>();
-    for (const folderId of saveByPostId.values()) {
-      counts.set(folderId, (counts.get(folderId) ?? 0) + 1);
-    }
-    return providerFolders.map((f) => ({
-      ...f,
-      post_count: counts.get(f.id) ?? 0,
-      cover_urls: [],
-    }));
-  }, [providerFolders, saveByPostId]);
-
   // Fetch on filter changes (skip first render — server already provided initial data)
   const isFirst = useRef(true);
   useEffect(() => {
@@ -115,19 +96,10 @@ export function HomeContent({
     const ac = new AbortController();
     progressRef.current.start();
 
-    // Instant paint for the saved-folders list: render counts/names from
-    // the in-memory provider data while we wait for the API to return cover
-    // thumbnails. No-op if user is on a specific folder, and don't clobber
-    // an already-populated cover list — synthetic has empty cover_urls and
-    // would flash a broken placeholder over working thumbnails on re-entry.
-    if (state.view === "saved" && !state.folder) {
-      setFolders((current) => {
-        if (current && current.some((f) => f.cover_urls.length > 0)) {
-          return current;
-        }
-        return syntheticFolders;
-      });
-    }
+    // Saved-list view: keep prior folders visible while the API refreshes
+    // (so re-entry doesn't blank out). We deliberately do NOT paint
+    // cover-less synthetic placeholders — they used to flash broken-image
+    // tiles for the duration of the fetch.
 
     (async () => {
       try {
@@ -304,7 +276,10 @@ function ContentBody({
         <FeedGrid posts={folderDetail.posts} ownerMap={folderDetail.owners} />
       );
     }
-    if (!folders || folders.length === 0) {
+    if (folders === null) {
+      return <FoldersSkeletonGrid />;
+    }
+    if (folders.length === 0) {
       return (
         <EmptyState
           icon={<Folder className="h-6 w-6" strokeWidth={1.6} />}
@@ -368,6 +343,28 @@ function FilterBarSticky({
         <FilterBar models={models} platforms={platforms} />
       </div>
     </>
+  );
+}
+
+function FoldersSkeletonGrid() {
+  return (
+    <div
+      className="grid gap-4"
+      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
+    >
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="overflow-hidden rounded-[14px] border bg-surface-2"
+        >
+          <div className="aspect-square animate-pulse bg-gradient-to-br from-surface to-surface-2" />
+          <div className="px-3 py-3">
+            <div className="h-3.5 w-2/3 animate-pulse rounded bg-surface-2" />
+            <div className="mt-2 h-2.5 w-1/3 animate-pulse rounded bg-surface-2" />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
