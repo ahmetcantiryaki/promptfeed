@@ -432,6 +432,10 @@ export type Database = {
         Args: { p_post_id: string }
         Returns: undefined
       }
+      record_post_view: {
+        Args: { p_post_id: string; p_viewer_id: string }
+        Returns: boolean
+      }
       is_admin: { Args: { uid: string }; Returns: boolean }
       set_default_save_folder: {
         Args: { target_folder_id: string }
