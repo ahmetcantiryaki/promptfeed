@@ -61,7 +61,11 @@ export function HomeContent({
   initialFolderDetail,
 }: Props) {
   const { state } = useFeedFilter();
-  const { isAuthed } = useInteractions();
+  const {
+    isAuthed,
+    folders: providerFolders,
+    saveByPostId,
+  } = useInteractions();
   const progress = useRouteProgress();
   const progressRef = useRef(progress);
   progressRef.current = progress;
@@ -84,6 +88,21 @@ export function HomeContent({
   const loadMoreInFlight = useRef(false);
   const requestId = useRef(0);
 
+  // Synthetic folder summaries derived from data already loaded in
+  // InteractionsProvider — lets us paint the saved view *instantly* on click
+  // (no spinner) while the network call enriches with cover thumbnails.
+  const syntheticFolders = useMemo<SaveFolderSummary[]>(() => {
+    const counts = new Map<string, number>();
+    for (const folderId of saveByPostId.values()) {
+      counts.set(folderId, (counts.get(folderId) ?? 0) + 1);
+    }
+    return providerFolders.map((f) => ({
+      ...f,
+      post_count: counts.get(f.id) ?? 0,
+      cover_urls: [],
+    }));
+  }, [providerFolders, saveByPostId]);
+
   // Fetch on filter changes (skip first render — server already provided initial data)
   const isFirst = useRef(true);
   useEffect(() => {
@@ -95,6 +114,13 @@ export function HomeContent({
     const id = ++requestId.current;
     const ac = new AbortController();
     progressRef.current.start();
+
+    // Instant paint for the saved-folders list: render counts/names from
+    // the in-memory provider data while we wait for the API to return cover
+    // thumbnails. No-op if user is on a specific folder.
+    if (state.view === "saved" && !state.folder) {
+      setFolders(syntheticFolders);
+    }
 
     (async () => {
       try {
@@ -108,8 +134,6 @@ export function HomeContent({
             if (id !== requestId.current) return;
             if (json.success) {
               setFolderDetail(json.data);
-              setFolders(null);
-              setFeed(null);
             } else {
               setFolderDetail(null);
             }
@@ -123,7 +147,6 @@ export function HomeContent({
             if (json.success) {
               setFolders(json.data.folders);
               setFolderDetail(null);
-              setFeed(null);
             }
           }
         } else {

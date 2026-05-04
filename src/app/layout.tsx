@@ -64,6 +64,12 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  // iOS/Android: when the on-screen keyboard appears, shrink the layout
+  // viewport instead of overlaying it. Combined with auto scrollIntoView
+  // on focus, this keeps the focused input visible above the keyboard.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

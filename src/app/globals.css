@@ -38,6 +38,17 @@
     --shadow: 0 1px 2px rgb(12 10 9 / 0.4);
   }
 
+  /* When an input/textarea inside a Radix Dialog gains focus, auto-scroll
+     it to the centre of its scroll container so the on-screen keyboard
+     never covers it. `scroll-margin` works with native focus + iOS visual-
+     viewport resize. */
+  [role="dialog"] input:focus,
+  [role="dialog"] textarea:focus,
+  [role="dialog"] [contenteditable="true"]:focus {
+    scroll-margin-top: 96px;
+    scroll-margin-bottom: 120px;
+  }
+
   html,
   body {
     background: var(--bg);
@@ -116,38 +127,41 @@
 }
 
 .pf-modal-overlay[data-state="open"] {
-  animation: pf-fade-in 180ms ease-out;
+  animation: pf-fade-in 120ms ease-out;
 }
 .pf-modal-overlay[data-state="closed"] {
-  animation: pf-fade-out 160ms ease-in;
+  animation: pf-fade-out 100ms ease-in;
 }
+/* Default modal animation — centred dialogs (translate -50% + scale).
+   Snappy: 180ms in, 140ms out. Used by every Radix Dialog whose content
+   is positioned with `left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`. */
 .pf-modal-content[data-state="open"] {
-  animation: pf-content-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: pf-content-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .pf-modal-content[data-state="closed"] {
-  animation: pf-content-out 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: pf-content-out 140ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Mobile (<md): the modal is fixed inset-0 (no translate), so we override
-   the desktop keyframes with a clean scale-from-click-origin pop. The origin
-   is fed in as CSS variables (--pf-origin-x/y) by the caller; if absent we
-   fall back to the screen centre. */
+/* Mobile-only: full-screen modals (no translate) that want a zoom-from-
+   tapped-origin pop. Caller adds class `pf-modal-pop` AND feeds origin via
+   inline CSS vars --pf-origin-x/--pf-origin-y. PostDetailModal is the only
+   consumer today. Outside <md, the centred default takes over. */
 @keyframes pf-modal-pop-in {
-  from { opacity: 0; transform: scale(0.55); }
+  from { opacity: 0; transform: scale(0.6); }
   to   { opacity: 1; transform: scale(1); }
 }
 @keyframes pf-modal-pop-out {
   from { opacity: 1; transform: scale(1); }
-  to   { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 0; transform: scale(0.65); }
 }
 @media (max-width: 767px) {
-  .pf-modal-content[data-state="open"] {
+  .pf-modal-pop[data-state="open"] {
     transform-origin: var(--pf-origin-x, 50%) var(--pf-origin-y, 50%);
-    animation: pf-modal-pop-in 280ms cubic-bezier(0.18, 0.9, 0.32, 1.08);
+    animation: pf-modal-pop-in 220ms cubic-bezier(0.18, 0.9, 0.32, 1.08);
   }
-  .pf-modal-content[data-state="closed"] {
+  .pf-modal-pop[data-state="closed"] {
     transform-origin: var(--pf-origin-x, 50%) var(--pf-origin-y, 50%);
-    animation: pf-modal-pop-out 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    animation: pf-modal-pop-out 160ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 

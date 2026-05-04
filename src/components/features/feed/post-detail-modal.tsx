@@ -124,7 +124,7 @@ export function PostDetailModal({
       <Dialog.Portal>
         <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] h-[100dvh] bg-black/85 backdrop-blur-xl" />
         <Dialog.Content
-          className="pf-modal-content fixed inset-x-0 top-0 z-[70] flex h-[100dvh] flex-col overflow-y-auto overflow-x-hidden bg-bg pb-[env(safe-area-inset-bottom)] outline-none md:inset-auto md:left-1/2 md:top-1/2 md:grid md:h-[96vh] md:w-[96vw] md:max-w-[1440px] md:-translate-x-1/2 md:-translate-y-1/2 md:grid-cols-[70%_30%] md:overflow-hidden md:rounded-[16px] md:pb-0"
+          className="pf-modal-content pf-modal-pop fixed inset-x-0 top-0 z-[70] flex h-[100dvh] flex-col overflow-y-auto overflow-x-hidden bg-bg pb-[env(safe-area-inset-bottom)] outline-none md:inset-auto md:left-1/2 md:top-1/2 md:grid md:h-[96vh] md:w-[96vw] md:max-w-[1440px] md:-translate-x-1/2 md:-translate-y-1/2 md:grid-cols-[70%_30%] md:overflow-hidden md:rounded-[16px] md:pb-0"
           style={
             origin
               ? ({
