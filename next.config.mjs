@@ -21,15 +21,18 @@ const securityHeaders = [
   },
   // CSP intentionally permissive on script-src for Next.js inline runtime;
   // tighten with a nonce when moving inline theme-init script to a route.
+  // accounts.google.com is allowed for Google Identity Services (sign-in
+  // popup + ID token flow used by the GoogleButton component).
   {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com",
+      "style-src 'self' 'unsafe-inline' https://accounts.google.com",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      `connect-src 'self' ${supabaseHostname ? `https://${supabaseHostname} wss://${supabaseHostname}` : ""}`.trim(),
+      `connect-src 'self' https://accounts.google.com ${supabaseHostname ? `https://${supabaseHostname} wss://${supabaseHostname}` : ""}`.trim(),
+      "frame-src 'self' https://accounts.google.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
