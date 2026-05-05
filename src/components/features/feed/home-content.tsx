@@ -134,6 +134,7 @@ export function HomeContent({
           if (state.platform) params.set("platform", state.platform);
           if (state.sort === "top") params.set("sort", "top");
           else if (state.sort === "oldest") params.set("sort", "oldest");
+          else if (state.sort === "viewed") params.set("sort", "viewed");
           if (state.q && state.q.trim()) params.set("q", state.q.trim());
           params.set("limit", String(PAGE_SIZE));
           const res = await fetch(`/api/posts?${params.toString()}`, {
@@ -176,6 +177,7 @@ export function HomeContent({
       if (state.platform) params.set("platform", state.platform);
       if (state.sort === "top") params.set("sort", "top");
       else if (state.sort === "oldest") params.set("sort", "oldest");
+      else if (state.sort === "viewed") params.set("sort", "viewed");
       if (state.q && state.q.trim()) params.set("q", state.q.trim());
       params.set("limit", String(PAGE_SIZE));
       params.set("cursor", feed.nextCursor);

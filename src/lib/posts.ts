@@ -42,6 +42,10 @@ export async function listPosts(filters: PostFilters = {}): Promise<Post[]> {
     query = query
       .order("likes", { ascending: false })
       .order("created_at", { ascending: false });
+  } else if (filters.sort === "viewed") {
+    query = query
+      .order("views", { ascending: false })
+      .order("created_at", { ascending: false });
   } else if (filters.sort === "oldest") {
     query = query.order("created_at", { ascending: true });
   } else {
@@ -299,6 +303,16 @@ export async function listPostsPaged(
   if (sort === "top") {
     query = query
       .order("likes", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (cursor) {
+      query = query.or(
+        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
+      );
+    }
+  } else if (sort === "viewed") {
+    query = query
+      .order("views", { ascending: false })
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
     if (cursor) {

@@ -10,6 +10,7 @@ import type { MediaType, PostSort } from "@/types/domain";
 function pickSort(raw: string | null): PostSort {
   if (raw === "top") return "top";
   if (raw === "oldest") return "oldest";
+  if (raw === "viewed") return "viewed";
   return "newest";
 }
 

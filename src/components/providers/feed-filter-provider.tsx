@@ -47,7 +47,9 @@ function readUrlState(
         ? "top"
         : params.get("sort") === "oldest"
           ? "oldest"
-          : "newest",
+          : params.get("sort") === "viewed"
+            ? "viewed"
+            : "newest",
     view: params.get("view") === "saved" ? "saved" : "feed",
     folder: params.get("folder") ?? undefined,
     q: params.get("q") ?? undefined,
@@ -60,6 +62,7 @@ function buildSearch(state: FeedFilterState): string {
   if (state.platform) params.set("platform", state.platform);
   if (state.sort === "top") params.set("sort", "top");
   else if (state.sort === "oldest") params.set("sort", "oldest");
+  else if (state.sort === "viewed") params.set("sort", "viewed");
   if (state.view === "saved") params.set("view", "saved");
   if (state.folder) params.set("folder", state.folder);
   if (state.q && state.q.trim()) params.set("q", state.q.trim());

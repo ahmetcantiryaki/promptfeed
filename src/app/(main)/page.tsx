@@ -39,6 +39,7 @@ interface SearchParams {
 function parseSort(raw?: string): PostSort {
   if (raw === "top") return "top";
   if (raw === "oldest") return "oldest";
+  if (raw === "viewed") return "viewed";
   return "newest";
 }
 

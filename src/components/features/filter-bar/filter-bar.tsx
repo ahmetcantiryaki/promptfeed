@@ -19,6 +19,7 @@ const SORT_OPTIONS: FilterOption[] = [
   { value: "newest", label: "Latest" },
   { value: "oldest", label: "Oldest" },
   { value: "top", label: "Top Liked" },
+  { value: "viewed", label: "Most Viewed" },
 ];
 
 export function FilterBar({ models, platforms }: FilterBarProps) {
