@@ -252,15 +252,24 @@ export function InteractionsProvider({
     setSaveDialogPost(null);
   }, []);
 
+  // Mirror of `folders` for sync access inside callbacks. Lets `saveToFolder`
+  // resolve a folder name even when called immediately after `addFolder` (the
+  // setFolders update wouldn't have flushed through closures yet).
+  const foldersRef = useRef(folders);
+  useEffect(() => {
+    foldersRef.current = folders;
+  }, [folders]);
+
   const saveToFolder = useCallback(
     async (postId: string, folderId: string) => {
       if (!userId) return;
-      const folder = folders.find((f) => f.id === folderId);
-      if (!folder) return;
       rememberFolder(folderId);
-      await insertSave(postId, folderId, folder.name);
+      const folder = foldersRef.current.find((f) => f.id === folderId);
+      // Don't bail when the folder list hasn't yet caught up to a just-created
+      // folder; fall back to a generic name for the toast.
+      await insertSave(postId, folderId, folder?.name ?? "folder");
     },
-    [userId, folders, insertSave, rememberFolder],
+    [userId, insertSave, rememberFolder],
   );
 
   const toggleSave = useCallback(
@@ -346,9 +355,15 @@ export function InteractionsProvider({
           : prev;
         return [created, ...cleared];
       });
+      // When the user opts into making this folder the default, also point the
+      // "last used folder" memory at it so subsequent SaveDialogs pre-select
+      // the new folder instead of the previous default.
+      if (makeDefault) {
+        rememberFolder(created.id);
+      }
       return created;
     },
-    [userId],
+    [userId, rememberFolder],
   );
 
   const createFirstFolderAndSave = useCallback(
@@ -383,11 +398,17 @@ export function InteractionsProvider({
     [userId, saveByPostId, folders],
   );
 
-  const setDefaultFolderClient = useCallback((folderId: string) => {
-    setFolders((prev) =>
-      prev.map((f) => ({ ...f, is_default: f.id === folderId })),
-    );
-  }, []);
+  const setDefaultFolderClient = useCallback(
+    (folderId: string) => {
+      setFolders((prev) =>
+        prev.map((f) => ({ ...f, is_default: f.id === folderId })),
+      );
+      // Setting a folder as default reflects the user's intent to use it for
+      // future saves, so update the "last folder" memory too.
+      rememberFolder(folderId);
+    },
+    [rememberFolder],
+  );
 
   const removeFolderFromState = useCallback((folderId: string) => {
     setFolders((prev) => prev.filter((f) => f.id !== folderId));
