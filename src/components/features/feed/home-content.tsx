@@ -71,7 +71,7 @@ export function HomeContent({
   initialLiked,
 }: Props) {
   const { state } = useFeedFilter();
-  const { isAuthed } = useInteractions();
+  const { isAuthed, liked: likedSet } = useInteractions();
   const progress = useRouteProgress();
   const progressRef = useRef(progress);
   progressRef.current = progress;
@@ -99,6 +99,18 @@ export function HomeContent({
         }
       : null,
   );
+
+  // When a post is unliked anywhere (heart toggled on a card), drop it from
+  // the cached liked list so the Liked view updates instantly — no refetch.
+  useEffect(() => {
+    setLiked((prev) => {
+      if (!prev) return prev;
+      const filtered = prev.posts.filter((p) => likedSet.has(p.id));
+      if (filtered.length === prev.posts.length) return prev;
+      return { ...prev, posts: filtered };
+    });
+  }, [likedSet]);
+
   const [loadingMore, setLoadingMore] = useState(false);
   const loadMoreInFlight = useRef(false);
   const requestId = useRef(0);
