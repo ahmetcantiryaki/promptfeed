@@ -25,6 +25,7 @@ import { SavedFoldersGrid } from "@/components/features/save-folders/saved-folde
 import { useFeedFilter } from "@/components/providers/feed-filter-provider";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { useRouteProgress } from "@/components/providers/route-progress-provider";
+import { useGridSize } from "@/hooks/use-grid-size";
 
 interface InitialFeed {
   posts: Post[];
@@ -336,7 +337,10 @@ function ContentBody({
         />
       );
     }
-    if (!liked || liked.posts.length === 0) {
+    if (liked === null) {
+      return <FeedSkeletonGrid />;
+    }
+    if (liked.posts.length === 0) {
       return (
         <EmptyState
           icon={<Heart className="h-6 w-6" strokeWidth={1.6} />}
@@ -453,6 +457,54 @@ function FilterBarSticky({
         <FilterBar models={models} platforms={platforms} />
       </div>
     </>
+  );
+}
+
+/**
+ * Masonry-style skeleton matching FeedGrid's flex-column layout. Heights are
+ * deterministic per slot so the skeleton doesn't jitter on re-renders.
+ */
+function FeedSkeletonGrid() {
+  const { cols: storedCols, mobileCols } = useGridSize();
+  const [columnCount, setColumnCount] = useState<number>(storedCols);
+  useEffect(() => {
+    function compute() {
+      setColumnCount(window.innerWidth < 768 ? mobileCols : storedCols);
+    }
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, [storedCols, mobileCols]);
+
+  // Card aspect heights cycle through a small set so columns visually stagger.
+  const HEIGHTS = [220, 300, 260, 340, 240, 320, 280];
+  const PER_COLUMN = 6;
+
+  return (
+    <div className="flex gap-3 sm:gap-4 lg:gap-5">
+      {Array.from({ length: columnCount }).map((_, colIdx) => (
+        <div key={colIdx} className="flex flex-1 flex-col gap-3 sm:gap-4 lg:gap-5">
+          {Array.from({ length: PER_COLUMN }).map((_, rowIdx) => {
+            const h = HEIGHTS[(colIdx + rowIdx * 2) % HEIGHTS.length] ?? 280;
+            return (
+              <div
+                key={rowIdx}
+                className="overflow-hidden rounded-[10px] border bg-surface-2"
+              >
+                <div
+                  className="animate-pulse bg-gradient-to-br from-surface to-surface-2"
+                  style={{ height: `${h}px` }}
+                />
+                <div className="space-y-2 px-3 py-2.5">
+                  <div className="h-3 w-3/4 animate-pulse rounded bg-surface" />
+                  <div className="h-3 w-1/2 animate-pulse rounded bg-surface" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
   );
 }
 
