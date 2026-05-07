@@ -81,19 +81,16 @@ export function RouteProgressProvider({ children }: { children: ReactNode }) {
     <ProgressContext.Provider value={value}>
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-[2px]"
+        className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-[3px]"
       >
         <div
-          className="h-full bg-gradient-to-r from-accent via-accent to-accent/40"
+          className="pf-progress-bar"
           style={{
             width: `${Math.round(progress * 100)}%`,
             opacity: active ? 1 : 0,
             transition: active
               ? "width 220ms ease-out, opacity 120ms"
               : "width 220ms ease-out, opacity 320ms 80ms",
-            boxShadow: active
-              ? "0 0 8px var(--accent), 0 0 4px var(--accent)"
-              : "none",
           }}
         />
       </div>
