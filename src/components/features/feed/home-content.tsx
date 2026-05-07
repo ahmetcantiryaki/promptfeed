@@ -358,6 +358,7 @@ function ContentBody({
         onLoadMore={onLoadMoreLiked}
         hasMore={Boolean(liked.nextCursor)}
         loadingMore={loadingMore}
+        showEndOfFeed={false}
       />
     );
   }
@@ -387,7 +388,11 @@ function ContentBody({
         );
       }
       return (
-        <FeedGrid posts={folderDetail.posts} ownerMap={folderDetail.owners} />
+        <FeedGrid
+          posts={folderDetail.posts}
+          ownerMap={folderDetail.owners}
+          showEndOfFeed={false}
+        />
       );
     }
     if (folders === null) {

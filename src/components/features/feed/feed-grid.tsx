@@ -55,6 +55,8 @@ interface Props {
   onLoadMore?: () => void;
   hasMore?: boolean;
   loadingMore?: boolean;
+  /** Show the "You've reached the end" footer when no more pages. Defaults to true. */
+  showEndOfFeed?: boolean;
 }
 
 interface Placement {
@@ -69,6 +71,7 @@ export function FeedGrid({
   onLoadMore,
   hasMore = false,
   loadingMore = false,
+  showEndOfFeed = true,
 }: Props) {
   const { cols: storedCols, mobileCols } = useGridSize();
   const [active, setActive] = useState<{
@@ -209,7 +212,7 @@ export function FeedGrid({
             <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2} />
           ) : null}
         </div>
-      ) : posts.length > 0 ? (
+      ) : showEndOfFeed && posts.length > 0 ? (
         <EndOfFeed />
       ) : null}
 
