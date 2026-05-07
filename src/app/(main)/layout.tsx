@@ -73,6 +73,7 @@ export default async function MainLayout({
               models={models}
               platforms={platforms}
               savedCount={saveData.savedIds.length}
+              likedCount={likedIds.length}
             />
             <main className="flex min-w-0 flex-col">
               <div className="z-40 bg-surface md:sticky md:top-0">
@@ -94,6 +95,7 @@ export default async function MainLayout({
               models={models}
               platforms={platforms}
               savedCount={saveData.savedIds.length}
+              likedCount={likedIds.length}
             />
 
             {user ? (

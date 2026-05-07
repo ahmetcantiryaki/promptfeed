@@ -12,7 +12,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import type { PostSort } from "@/types/domain";
 
-export type FeedView = "feed" | "saved";
+export type FeedView = "feed" | "saved" | "liked";
 
 export interface FeedFilterState {
   model?: string;
@@ -50,7 +50,12 @@ function readUrlState(
           : params.get("sort") === "viewed"
             ? "viewed"
             : "newest",
-    view: params.get("view") === "saved" ? "saved" : "feed",
+    view:
+      params.get("view") === "saved"
+        ? "saved"
+        : params.get("view") === "liked"
+          ? "liked"
+          : "feed",
     folder: params.get("folder") ?? undefined,
     q: params.get("q") ?? undefined,
   };
@@ -64,6 +69,7 @@ function buildSearch(state: FeedFilterState): string {
   else if (state.sort === "oldest") params.set("sort", "oldest");
   else if (state.sort === "viewed") params.set("sort", "viewed");
   if (state.view === "saved") params.set("view", "saved");
+  else if (state.view === "liked") params.set("view", "liked");
   if (state.folder) params.set("folder", state.folder);
   if (state.q && state.q.trim()) params.set("q", state.q.trim());
   return params.toString();
@@ -104,8 +110,8 @@ export function FeedFilterProvider({ children }: ProviderProps) {
         if (patch.view !== undefined && next.view !== "saved") {
           next.folder = undefined;
         }
-        // Switching into saved view: drop feed-only filters.
-        if (next.view === "saved") {
+        // Switching into saved/liked view: drop feed-only filters.
+        if (next.view === "saved" || next.view === "liked") {
           next.model = undefined;
           next.platform = undefined;
           next.sort = "newest";

@@ -13,6 +13,7 @@ import {
   listFolderSummaries,
   listSavedPostsInFolder,
 } from "@/lib/folders";
+import { listLikedPosts } from "@/lib/interactions";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import {
   canonicalQuery,
@@ -57,9 +58,17 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const params = await searchParams;
   const isSavedView = params.view === "saved";
+  const isLikedView = params.view === "liked";
   if (isSavedView) {
     return {
       title: "Saved",
+      robots: { index: false, follow: false },
+      alternates: { canonical: "/" },
+    };
+  }
+  if (isLikedView) {
+    return {
+      title: "Liked",
       robots: { index: false, follow: false },
       alternates: { canonical: "/" },
     };
@@ -107,6 +116,7 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const isSavedView = params.view === "saved";
+  const isLikedView = params.view === "liked";
   const activeFolderId = isSavedView ? params.folder ?? null : null;
 
   const user = await getCurrentUser();
@@ -121,6 +131,11 @@ export default async function Home({
   let initialFolderDetail:
     | { folder: SaveFolder; posts: Post[]; owners: OwnerMap }
     | null = null;
+  let initialLiked: {
+    posts: Post[];
+    owners: OwnerMap;
+    nextCursor: string | null;
+  } | null = null;
 
   if (isSavedView && user) {
     if (activeFolderId) {
@@ -140,7 +155,20 @@ export default async function Home({
       const data = await getUserFoldersAndSaves(user.id);
       initialFolders = await listFolderSummaries(user.id, data);
     }
-  } else if (!isSavedView) {
+  } else if (isLikedView && user) {
+    const { posts, nextCursor } = await listLikedPosts(user.id, 60, null);
+    const ownerIds = posts
+      .map((p) => p.owner_id)
+      .filter((id): id is string => Boolean(id));
+    const owners = await getOwnerProfiles(ownerIds);
+    initialLiked = {
+      posts,
+      owners,
+      nextCursor: nextCursor
+        ? Buffer.from(JSON.stringify(nextCursor), "utf8").toString("base64")
+        : null,
+    };
+  } else if (!isSavedView && !isLikedView) {
     const { posts, nextCursor } = await listPostsPaged({
       model: params.model,
       platform: params.platform,
@@ -167,6 +195,7 @@ export default async function Home({
       initialFeed={initialFeed}
       initialFolders={initialFolders}
       initialFolderDetail={initialFolderDetail}
+      initialLiked={initialLiked}
     />
   );
 }

@@ -62,7 +62,8 @@ function writeLastFolderId(folderId: string): void {
 
 type PendingAuthAction =
   | { kind: "like"; postId: string }
-  | { kind: "save"; post: Post };
+  | { kind: "save"; post: Post }
+  | { kind: "navigate"; href: string };
 
 interface InteractionsState {
   isAuthed: boolean;
@@ -80,6 +81,8 @@ interface InteractionsState {
   lastFolderId: string | null;
   toggleLike: (postId: string) => Promise<void>;
   toggleSave: (post: Post) => Promise<void>;
+  /** Open the sign-in dialog; on success, navigate to `href`. No-op if already authed. */
+  requestSignInForNav: (href: string) => boolean;
   requestSave: (post: Post) => void;
   closeSaveDialog: () => void;
   openPickerForPost: (postId: string) => void;
@@ -289,6 +292,16 @@ export function InteractionsProvider({
     toggleSaveRef.current = toggleSave;
   }, [toggleSave]);
 
+  const requestSignInForNav = useCallback(
+    (href: string) => {
+      if (userId) return false;
+      setPendingAuthAction({ kind: "navigate", href });
+      setSignInOpen(true);
+      return true;
+    },
+    [userId],
+  );
+
   const prevUserIdRef = useRef<string | null>(userId);
   useEffect(() => {
     const justSignedIn = !prevUserIdRef.current && Boolean(userId);
@@ -299,8 +312,14 @@ export function InteractionsProvider({
     setSignInOpen(false);
     if (action.kind === "like") {
       void toggleLikeRef.current(action.postId);
-    } else {
+    } else if (action.kind === "save") {
       void toggleSaveRef.current(action.post);
+    } else {
+      // Full reload: ensures the new searchParams (?view=liked) are read by
+      // FeedFilterProvider on mount. router.push would update the URL but the
+      // provider's local state only re-syncs on popstate, not on programmatic
+      // navigation, so the view wouldn't switch.
+      window.location.href = action.href;
     }
   }, [userId, pendingAuthAction]);
 
@@ -418,6 +437,7 @@ export function InteractionsProvider({
       lastFolderId,
       toggleLike,
       toggleSave,
+      requestSignInForNav,
       requestSave,
       closeSaveDialog,
       openPickerForPost,
@@ -446,6 +466,7 @@ export function InteractionsProvider({
       lastFolderId,
       toggleLike,
       toggleSave,
+      requestSignInForNav,
       requestSave,
       closeSaveDialog,
       openPickerForPost,
@@ -494,6 +515,7 @@ export function useInteractions(): InteractionsState {
       lastFolderId: null,
       toggleLike: noopAsync,
       toggleSave: noopAsync,
+      requestSignInForNav: () => false,
       requestSave: () => {},
       closeSaveDialog: () => {},
       openPickerForPost: () => {},

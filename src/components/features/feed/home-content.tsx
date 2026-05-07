@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Bookmark,
   Folder,
+  Heart,
   Sparkles,
   Cpu,
   Globe,
@@ -37,12 +38,19 @@ interface InitialFolderDetail {
   owners: OwnerMap;
 }
 
+interface InitialLiked {
+  posts: Post[];
+  owners: OwnerMap;
+  nextCursor: string | null;
+}
+
 interface Props {
   models: Model[];
   platforms: Platform[];
   initialFeed: InitialFeed | null;
   initialFolders: SaveFolderSummary[] | null;
   initialFolderDetail: InitialFolderDetail | null;
+  initialLiked: InitialLiked | null;
 }
 
 interface FeedData {
@@ -59,6 +67,7 @@ export function HomeContent({
   initialFeed,
   initialFolders,
   initialFolderDetail,
+  initialLiked,
 }: Props) {
   const { state } = useFeedFilter();
   const { isAuthed } = useInteractions();
@@ -80,6 +89,15 @@ export function HomeContent({
   );
   const [folderDetail, setFolderDetail] =
     useState<InitialFolderDetail | null>(initialFolderDetail);
+  const [liked, setLiked] = useState<FeedData | null>(
+    initialLiked
+      ? {
+          posts: initialLiked.posts,
+          owners: initialLiked.owners,
+          nextCursor: initialLiked.nextCursor,
+        }
+      : null,
+  );
   const [loadingMore, setLoadingMore] = useState(false);
   const loadMoreInFlight = useRef(false);
   const requestId = useRef(0);
@@ -127,6 +145,20 @@ export function HomeContent({
               setFolders(json.data.folders);
               setFolderDetail(null);
             }
+          }
+        } else if (state.view === "liked") {
+          const res = await fetch(`/api/liked`, {
+            signal: ac.signal,
+            cache: "no-store",
+          });
+          const json = await res.json();
+          if (id !== requestId.current) return;
+          if (json.success) {
+            setLiked({
+              posts: json.data.posts,
+              owners: json.data.owners,
+              nextCursor: json.data.nextCursor ?? null,
+            });
           }
         } else {
           const params = new URLSearchParams({ type: "image" });
@@ -204,6 +236,38 @@ export function HomeContent({
     }
   }, [feed, state.model, state.platform, state.sort, state.q]);
 
+  const loadMoreLiked = useCallback(async () => {
+    if (loadMoreInFlight.current) return;
+    if (!liked || !liked.nextCursor) return;
+    loadMoreInFlight.current = true;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("cursor", liked.nextCursor);
+      const res = await fetch(`/api/liked?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (json.success) {
+        const seen = new Set(liked.posts.map((p) => p.id));
+        const incoming = (json.data.posts as Post[]).filter(
+          (p) => !seen.has(p.id),
+        );
+        setLiked({
+          posts: [...liked.posts, ...incoming],
+          owners: { ...liked.owners, ...(json.data.owners as OwnerMap) },
+          nextCursor: json.data.nextCursor ?? null,
+        });
+      }
+    } catch {
+      // swallow — infinite scroll failures shouldn't disrupt the page
+    } finally {
+      loadMoreInFlight.current = false;
+      setLoadingMore(false);
+    }
+  }, [liked]);
+
   return (
     <>
       {state.view === "feed" ? (
@@ -217,6 +281,9 @@ export function HomeContent({
         {state.view === "saved" ? (
           <SavedHeader detail={folderDetail} folders={folders ?? []} />
         ) : null}
+        {state.view === "liked" ? (
+          <LikedHeader count={liked?.posts.length ?? 0} />
+        ) : null}
 
         <ContentBody
           state={state}
@@ -224,7 +291,9 @@ export function HomeContent({
           feed={feed}
           folders={folders}
           folderDetail={folderDetail}
+          liked={liked}
           onLoadMore={loadMore}
+          onLoadMoreLiked={loadMoreLiked}
           loadingMore={loadingMore}
         />
       </div>
@@ -238,7 +307,9 @@ interface BodyProps {
   feed: FeedData | null;
   folders: SaveFolderSummary[] | null;
   folderDetail: InitialFolderDetail | null;
+  liked: FeedData | null;
   onLoadMore: () => void;
+  onLoadMoreLiked: () => void;
   loadingMore: boolean;
 }
 
@@ -248,9 +319,44 @@ function ContentBody({
   feed,
   folders,
   folderDetail,
+  liked,
   onLoadMore,
+  onLoadMoreLiked,
   loadingMore,
 }: BodyProps) {
+  if (state.view === "liked") {
+    if (!isAuthed) {
+      return (
+        <EmptyState
+          icon={<Heart className="h-6 w-6" strokeWidth={1.6} />}
+          title="Sign in to see your liked prompts"
+          body="Like any prompt to keep it here — synced across devices."
+          ctaHref="/login"
+          ctaLabel="Sign in"
+        />
+      );
+    }
+    if (!liked || liked.posts.length === 0) {
+      return (
+        <EmptyState
+          icon={<Heart className="h-6 w-6" strokeWidth={1.6} />}
+          title="No liked prompts yet"
+          body="Tap the heart on any prompt to keep it here."
+          ctaHref="/"
+          ctaLabel="Browse Discover"
+        />
+      );
+    }
+    return (
+      <FeedGrid
+        posts={liked.posts}
+        ownerMap={liked.owners}
+        onLoadMore={onLoadMoreLiked}
+        hasMore={Boolean(liked.nextCursor)}
+        loadingMore={loadingMore}
+      />
+    );
+  }
   if (state.view === "saved") {
     if (!isAuthed) {
       return (
@@ -421,6 +527,20 @@ function StatsStrip({
         </span>
       ))}
     </div>
+  );
+}
+
+function LikedHeader({ count }: { count: number }) {
+  return (
+    <header className="mb-5 flex items-center gap-2">
+      <Heart className="h-4 w-4 text-text-muted" strokeWidth={2} />
+      <h1 className="text-[17px] font-semibold tracking-tight">
+        Liked prompts
+      </h1>
+      <span className="text-[13px] text-text-subtle">
+        {count} {count === 1 ? "item" : "items"}
+      </span>
+    </header>
   );
 }
 

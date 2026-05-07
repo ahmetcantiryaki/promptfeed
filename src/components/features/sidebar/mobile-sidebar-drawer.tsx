@@ -62,12 +62,14 @@ interface MobileSidebarDrawerProps {
   models: Model[];
   platforms: Platform[];
   savedCount?: number;
+  likedCount?: number;
 }
 
 export function MobileSidebarDrawer({
   models,
   platforms,
   savedCount,
+  likedCount,
 }: MobileSidebarDrawerProps) {
   const { open, setOpen } = useMobileSidebar();
   const pathname = usePathname();
@@ -102,6 +104,7 @@ export function MobileSidebarDrawer({
             models={models}
             platforms={platforms}
             savedCount={savedCount}
+            likedCount={likedCount}
             variant="drawer"
           />
         </Dialog.Content>

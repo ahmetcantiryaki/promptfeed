@@ -39,6 +39,10 @@ export function SavedFoldersGrid({ folders: initialFolders }: Props) {
     null,
   );
   const [renameValue, setRenameValue] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<SaveFolderSummary | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
 
   function patchLocal(folderId: string, patch: Partial<SaveFolderSummary>) {
     setFolders((prev) =>
@@ -83,23 +87,24 @@ export function SavedFoldersGrid({ folders: initialFolders }: Props) {
     }
   }
 
-  async function handleDelete(folder: SaveFolderSummary) {
-    if (folder.is_default) {
-      toast.error("Default folder can't be deleted");
-      return;
-    }
-    const ok = window.confirm(
-      `Delete folder "${folder.name}" and ${folder.post_count} saved ${folder.post_count === 1 ? "prompt" : "prompts"}?`,
-    );
-    if (!ok) return;
+  function handleDelete(folder: SaveFolderSummary) {
+    setDeleteTarget(folder);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deleteFolder(folder.id);
-      setFolders((prev) => prev.filter((f) => f.id !== folder.id));
-      removeFolderFromState(folder.id);
+      await deleteFolder(deleteTarget.id);
+      setFolders((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+      removeFolderFromState(deleteTarget.id);
       toast.success("Folder deleted");
+      setDeleteTarget(null);
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not delete");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -176,7 +181,6 @@ export function SavedFoldersGrid({ folders: initialFolders }: Props) {
                     icon={<Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />}
                     label="Delete"
                     danger
-                    disabled={f.is_default}
                     onSelect={() => handleDelete(f)}
                   />
                 </DropdownMenu.Content>
@@ -226,6 +230,17 @@ export function SavedFoldersGrid({ folders: initialFolders }: Props) {
           onChange={setRenameValue}
           onCancel={() => setRenameTarget(null)}
           onSubmit={commitRename}
+        />
+      ) : null}
+
+      {deleteTarget ? (
+        <DeleteFolderDialog
+          folder={deleteTarget}
+          deleting={deleting}
+          onCancel={() => {
+            if (!deleting) setDeleteTarget(null);
+          }}
+          onConfirm={confirmDelete}
         />
       ) : null}
     </>
@@ -352,6 +367,74 @@ function FolderMenuItem({
       {icon}
       {label}
     </DropdownMenu.Item>
+  );
+}
+
+function DeleteFolderDialog({
+  folder,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  folder: SaveFolderSummary;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const promptLabel = folder.post_count === 1 ? "prompt" : "prompts";
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-folder-title"
+      className="fixed inset-0 z-[80] grid place-items-center bg-black/65 p-4 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !deleting) onCancel();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && !deleting) onCancel();
+      }}
+    >
+      <div className="w-[min(92vw,420px)] overflow-hidden rounded-[14px] border bg-surface shadow-2xl">
+        <div className="border-b px-5 py-3.5">
+          <div
+            id="delete-folder-title"
+            className="text-[14px] font-semibold tracking-tight"
+          >
+            Delete folder?
+          </div>
+        </div>
+        <div className="px-5 py-4 text-[13px] text-text-muted">
+          <p>
+            <span className="font-medium text-text">
+              &ldquo;{folder.name}&rdquo;
+            </span>{" "}
+            and its {folder.post_count} saved {promptLabel} will be removed.
+          </p>
+          <p className="mt-2 text-[12px] text-text-subtle">
+            Your likes are kept — this only clears saves in this folder.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 border-t bg-surface px-4 py-3">
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onCancel}
+            className="rounded-[10px] border bg-surface px-3 py-1.5 text-[12px] font-medium text-text-muted hover:bg-hover hover:text-text disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onConfirm}
+            className="rounded-[10px] border border-red-500/60 bg-red-500 px-3 py-1.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            {deleting ? "Deleting…" : "Delete folder"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

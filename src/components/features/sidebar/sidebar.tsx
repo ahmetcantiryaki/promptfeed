@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, Bookmark } from "lucide-react";
+import { Compass, Bookmark, Heart } from "lucide-react";
 import type { Model, Platform } from "@/types/domain";
 import { LogoMark } from "@/components/ui/logo-mark";
 import { ModelBadge } from "@/lib/model-icon";
@@ -12,18 +12,20 @@ import {
   useFeedFilter,
   type FeedFilterState,
 } from "@/components/providers/feed-filter-provider";
+import { useInteractions } from "@/components/providers/interactions-provider";
 
 function OtherBadge({ size = 20 }: { size?: number }) {
   return <PlatformBadge platform="web" size={size} />;
 }
 
-export type SidebarRoute = "discover" | "saved" | null;
+export type SidebarRoute = "discover" | "liked" | "saved" | null;
 export type SidebarVariant = "rail" | "drawer";
 
 interface SidebarProps {
   models: Model[];
   platforms: Platform[];
   savedCount?: number;
+  likedCount?: number;
 }
 
 interface SidebarBodyProps extends SidebarProps {
@@ -36,6 +38,7 @@ function deriveActiveRoute(
 ): SidebarRoute {
   if (pathname !== "/") return null;
   if (state.view === "saved") return "saved";
+  if (state.view === "liked") return "liked";
   if (
     state.view === "feed" &&
     !state.model &&
@@ -65,6 +68,14 @@ const MAIN_NAV: NavEntry[] = [
     patch: { view: "feed", model: undefined, platform: undefined, sort: "newest", folder: undefined },
   },
   {
+    key: "liked",
+    label: "Liked",
+    Icon: Heart,
+    href: "/?view=liked",
+    patch: { view: "liked", folder: undefined },
+    authOnly: true,
+  },
+  {
     key: "saved",
     label: "Saved",
     Icon: Bookmark,
@@ -78,13 +89,19 @@ const MAIN_NAV: NavEntry[] = [
  * Static desktop sidebar rail (≥lg). Below lg the drawer renders
  * <SidebarBody variant="drawer"> instead.
  */
-export function Sidebar({ models, platforms, savedCount }: SidebarProps) {
+export function Sidebar({
+  models,
+  platforms,
+  savedCount,
+  likedCount,
+}: SidebarProps) {
   return (
     <aside className="sticky top-0 hidden h-[100dvh] w-[248px] shrink-0 overflow-hidden border-r bg-surface lg:block">
       <SidebarBody
         models={models}
         platforms={platforms}
         savedCount={savedCount}
+        likedCount={likedCount}
         variant="rail"
       />
     </aside>
@@ -95,10 +112,22 @@ export function SidebarBody({
   models,
   platforms,
   savedCount,
+  likedCount,
   variant = "rail",
 }: SidebarBodyProps) {
   const pathname = usePathname();
   const { state, setFilter } = useFeedFilter();
+  const {
+    isAuthed,
+    liked,
+    saved,
+    requestSignInForNav,
+  } = useInteractions();
+  // Live counts: prefer client-side state once authed so toggling like/save
+  // updates the badge immediately. Falls back to SSR-passed props for the
+  // initial render of anonymous users.
+  const liveLikedCount = isAuthed ? liked.size : likedCount;
+  const liveSavedCount = isAuthed ? saved.size : savedCount;
   const activeRoute = deriveActiveRoute(pathname ?? "/", state);
   const isHomePath = (pathname ?? "/") === "/";
   const isDrawer = variant === "drawer";
@@ -121,9 +150,15 @@ export function SidebarBody({
       </Link>
 
       <nav className="flex flex-col gap-0.5">
-        {MAIN_NAV.map(({ key, label, Icon, href, patch }) => {
+        {MAIN_NAV.map(({ key, label, Icon, href, patch, authOnly }) => {
           const active = activeRoute === key;
-          const count = key === "saved" ? savedCount : undefined;
+          const count =
+            key === "saved"
+              ? liveSavedCount
+              : key === "liked"
+                ? liveLikedCount
+                : undefined;
+          const requiresAuth = Boolean(authOnly) && !isAuthed;
           return (
             <FilterNavItem
               key={key}
@@ -131,6 +166,8 @@ export function SidebarBody({
               isHomePath={isHomePath}
               active={active}
               onSelect={() => setFilter(patch)}
+              gateAuth={requiresAuth}
+              onGatedAuth={() => requestSignInForNav(href)}
               className={cn(
                 "flex items-center gap-2.5 rounded-[8px] px-2.5 text-[14px] transition-colors",
                 itemPaddingY,
@@ -206,6 +243,9 @@ interface FilterNavItemProps extends React.HTMLAttributes<HTMLAnchorElement> {
   isHomePath: boolean;
   active: boolean;
   onSelect: () => void;
+  /** When true, click opens the sign-in dialog instead of navigating. */
+  gateAuth?: boolean;
+  onGatedAuth?: () => void;
   children: React.ReactNode;
 }
 
@@ -214,6 +254,8 @@ function FilterNavItem({
   isHomePath,
   active,
   onSelect,
+  gateAuth = false,
+  onGatedAuth,
   children,
   className,
   ...rest
@@ -234,6 +276,11 @@ function FilterNavItem({
           e.altKey ||
           e.button !== 0
         ) {
+          return;
+        }
+        if (gateAuth) {
+          e.preventDefault();
+          onGatedAuth?.();
           return;
         }
         if (!isHomePath) return; // let real navigation happen
