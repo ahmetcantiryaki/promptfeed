@@ -17,8 +17,6 @@ interface Props {
   /** Width / height ratio — reserves masonry space so the card doesn't
    *  reflow when the poster/frame loads. Default 16/9. */
   aspectRatio?: number | null;
-  /** Total length in seconds — drives the "0:12" in the corner badge. */
-  durationSeconds?: number | null;
   alt: string;
 }
 
@@ -39,7 +37,6 @@ export function VideoCardPreview({
   videoUrl,
   posterUrl,
   aspectRatio,
-  durationSeconds,
   alt,
 }: Props) {
   const ratio = aspectRatio && aspectRatio > 0 ? aspectRatio : 16 / 9;
@@ -58,18 +55,13 @@ export function VideoCardPreview({
         <FirstFrameVideo videoUrl={videoUrl} aspectRatio={ratio} alt={alt} />
       )}
 
-      {/* Top-right "this is a video" badge — small play glyph + duration. */}
+      {/* Top-right play badge — a clean circular control that reads as
+          "video" identically on every card (no duration → no inconsistency). */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute right-2 top-2 z-30 inline-flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white backdrop-blur-md"
+        className="pointer-events-none absolute right-2.5 top-2.5 z-30 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white shadow-sm ring-1 ring-white/20 backdrop-blur-md transition-transform duration-300 ease-out group-hover:scale-105"
       >
-        <Play
-          className="h-3 w-3 translate-x-[0.5px] fill-white"
-          strokeWidth={0}
-        />
-        {durationSeconds && durationSeconds > 0 ? (
-          <span>{formatDuration(durationSeconds)}</span>
-        ) : null}
+        <Play className="h-4 w-4 translate-x-[1px] fill-white" strokeWidth={0} />
       </span>
     </div>
   );
@@ -154,16 +146,4 @@ function FirstFrameVideo({
       ) : null}
     </div>
   );
-}
-
-function formatDuration(sec: number): string {
-  const total = Math.max(0, Math.round(sec));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  if (m >= 60) {
-    const h = Math.floor(m / 60);
-    const mm = m % 60;
-    return `${h}:${String(mm).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  }
-  return `${m}:${String(s).padStart(2, "0")}`;
 }

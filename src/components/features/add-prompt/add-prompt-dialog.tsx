@@ -678,14 +678,14 @@ export function AddPromptDialog({
             </Dialog.Close>
           </div>
 
-          <div className="grid grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1.05fr)_minmax(440px,1fr)]">
+          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1.05fr)_minmax(440px,1fr)] lg:overflow-hidden">
             {/* LEFT: media area (image upload OR video URL inputs) */}
-            <div className="flex flex-col gap-3 overflow-y-auto border-b bg-surface-2/40 p-5 lg:border-b-0 lg:border-r">
+            <div className="flex flex-col gap-3 border-b bg-surface-2/40 p-5 lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
               {/* Media type segmented control — picks the entire flow. */}
               <div
                 role="radiogroup"
                 aria-label="Media type"
-                className="inline-flex overflow-hidden rounded-[10px] border bg-surface p-0.5"
+                className="inline-flex shrink-0 overflow-hidden rounded-[10px] border bg-surface p-0.5"
               >
                 {(
                   [
@@ -806,7 +806,7 @@ export function AddPromptDialog({
             </div>
 
             {/* RIGHT: form */}
-            <div className="flex flex-col gap-3.5 overflow-y-auto p-5">
+            <div className="flex flex-col gap-3.5 p-5 lg:min-h-0 lg:overflow-y-auto">
               {/* Source URL — single field, platform + handle parsed from it */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-1.5 text-[12px] font-medium text-text-muted">
@@ -1098,7 +1098,6 @@ function VideoSection({
   const safe = safeVideoSrc(trimmed);
   const looksRight = trimmed ? looksLikeVideoUrl(trimmed) : true;
   const frameSrc = firstFrameSrc(safe);
-  const inputPreview = slotPreviewUrl(source);
 
   return (
     <div className="flex flex-col gap-3">
@@ -1138,32 +1137,6 @@ function VideoSection({
         ) : null}
       </div>
 
-      {/* Live preview — the input image (image-to-video) or the first frame
-          of the clip (text-to-video), matching what the card will show. */}
-      <div className="overflow-hidden rounded-[10px] border bg-black">
-        {isI2V && inputPreview ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={inputPreview}
-            alt="Input image preview"
-            className="block aspect-video w-full object-contain"
-          />
-        ) : frameSrc ? (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video
-            src={frameSrc}
-            muted
-            playsInline
-            preload="metadata"
-            className="block aspect-video w-full object-contain"
-          />
-        ) : (
-          <div className="grid aspect-video w-full place-items-center text-[11px] text-text-subtle">
-            Preview appears here
-          </div>
-        )}
-      </div>
-
       {/* image-to-video toggle — mirrors the image remix checkbox. */}
       <label className="flex items-center gap-2.5 rounded-[10px] border bg-surface px-3 py-2 text-[13px] font-medium text-text">
         <input
@@ -1180,6 +1153,7 @@ function VideoSection({
       </label>
 
       {isI2V ? (
+        /* Input image is the card poster — the picker is the only preview. */
         <SlotPicker
           label="Input image"
           inputRef={sourceInputRef}
@@ -1191,11 +1165,30 @@ function VideoSection({
           onDragState={onDragState}
         />
       ) : (
-        <div className="rounded-[10px] border bg-surface-2/40 px-3 py-2 text-[11px] leading-[1.5] text-text-subtle">
-          Paste a direct video link (.mp4/.webm) — we don&rsquo;t host the
-          file. The card shows its first frame; the detail view plays it.
-          Flip the toggle if an input image produced the clip.
-        </div>
+        <>
+          {/* text-to-video: show the first frame the card will use */}
+          <div className="overflow-hidden rounded-[10px] border bg-black">
+            {frameSrc ? (
+              // eslint-disable-next-line jsx-a11y/media-has-caption
+              <video
+                src={frameSrc}
+                muted
+                playsInline
+                preload="metadata"
+                className="block aspect-video w-full object-contain"
+              />
+            ) : (
+              <div className="grid aspect-video w-full place-items-center text-[11px] text-text-subtle">
+                Preview appears here
+              </div>
+            )}
+          </div>
+          <div className="rounded-[10px] border bg-surface-2/40 px-3 py-2 text-[11px] leading-[1.5] text-text-subtle">
+            Paste a direct video link (.mp4/.webm) — we don&rsquo;t host the
+            file. The card shows its first frame; the detail view plays it.
+            Flip the toggle if an input image produced the clip.
+          </div>
+        </>
       )}
     </div>
   );

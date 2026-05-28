@@ -88,7 +88,6 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
           videoUrl={post.media_url}
           posterUrl={videoPosterUrl(post)}
           aspectRatio={post.aspect_ratio}
-          durationSeconds={post.duration_seconds}
           alt={post.prompt.slice(0, 80)}
         />
       ) : isRemix ? (
