@@ -50,6 +50,19 @@ export const TAG_AXIS_LABEL: Record<TagAxis, string> = {
   use_case: "Use case",
 };
 
+/**
+ * How multi-tag filters compose:
+ *   - "all" → intersection (post must carry every selected tag) — current default
+ *   - "any" → union (post matching at least one tag passes)
+ * Defaults to "all" everywhere it isn't explicitly set.
+ */
+export type TagsMatchMode = "all" | "any";
+export const DEFAULT_TAGS_MATCH_MODE: TagsMatchMode = "all";
+
+export function isTagsMatchMode(value: unknown): value is TagsMatchMode {
+  return value === "all" || value === "any";
+}
+
 export interface SaveFolderSummary extends SaveFolder {
   post_count: number;
   cover_urls: string[];

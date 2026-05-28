@@ -75,6 +75,9 @@ export function TagPillsCompact({
 interface RowProps {
   slugs: readonly string[] | undefined;
   className?: string;
+  /** When provided, each pill becomes a button that fires the handler. The
+   *  modal uses this to apply the tag filter and close itself in one click. */
+  onTagClick?: (slug: string) => void;
 }
 
 /**
@@ -82,8 +85,12 @@ interface RowProps {
  * Used inside the modal's "Tags" field where space is tight and the axis
  * grouping adds noise. Tags are sorted subject → style → use_case so the
  * implicit ordering still reads consistently.
+ *
+ * Each pill is rendered as a `<button>` when `onTagClick` is supplied so the
+ * user can jump from "what tagged this image" straight into the filtered
+ * feed; otherwise pills render as inert `<span>`s.
  */
-export function TagPillsRow({ slugs, className }: RowProps) {
+export function TagPillsRow({ slugs, className, onTagClick }: RowProps) {
   const resolved = useResolveTags(slugs);
   if (resolved.length === 0) return null;
   const axisOrder: Record<TagAxis, number> = {
@@ -94,16 +101,29 @@ export function TagPillsRow({ slugs, className }: RowProps) {
   const ordered = [...resolved].sort(
     (a, b) => axisOrder[a.axis] - axisOrder[b.axis],
   );
+  const baseClass =
+    "inline-flex items-center rounded-full border bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-text";
+  const interactiveClass =
+    "transition-colors hover:border-text hover:bg-text hover:text-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
   return (
     <div className={cn("flex flex-wrap gap-1.5", className)} aria-label="Tags">
-      {ordered.map((tag) => (
-        <span
-          key={tag.slug}
-          className="inline-flex items-center rounded-full border bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-text"
-        >
-          {tag.name}
-        </span>
-      ))}
+      {ordered.map((tag) =>
+        onTagClick ? (
+          <button
+            key={tag.slug}
+            type="button"
+            onClick={() => onTagClick(tag.slug)}
+            title={`Browse posts tagged ${tag.name}`}
+            className={cn(baseClass, interactiveClass)}
+          >
+            {tag.name}
+          </button>
+        ) : (
+          <span key={tag.slug} className={baseClass}>
+            {tag.name}
+          </span>
+        ),
+      )}
     </div>
   );
 }

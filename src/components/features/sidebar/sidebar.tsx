@@ -1,10 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Compass, Bookmark, Heart, X } from "lucide-react";
-import type { Model, Platform, Tag, TagAxis, TagsByAxis } from "@/types/domain";
+import type {
+  Model,
+  Platform,
+  Tag,
+  TagAxis,
+  TagsByAxis,
+  TagsMatchMode,
+} from "@/types/domain";
 import { TAG_AXES, TAG_AXIS_LABEL } from "@/types/domain";
 import { LogoMark } from "@/components/ui/logo-mark";
 import { ModelBadge } from "@/lib/model-icon";
@@ -103,7 +110,7 @@ export function SidebarBody({
   variant = "rail",
 }: SidebarBodyProps) {
   const pathname = usePathname();
-  const { state } = useFeedFilter();
+  const { state, setFilter } = useFeedFilter();
   const { isAuthed, liked, saved, requestSignInForNav } = useInteractions();
   // Live counts: prefer client-side state once authed so toggling like/save
   // updates the badge immediately. Falls back to SSR-passed props for the
@@ -152,34 +159,32 @@ export function SidebarBody({
   }
 
   /**
-   * Toggle a tag in the active set — clicking an inactive tag adds it,
-   * clicking an active tag removes it. The URL preserves model/platform/sort/q
-   * so users can stack filters (e.g. midjourney + photoreal + portrait).
+   * Toggle a tag through the provider. Going via `setFilter` (button +
+   * history.replaceState) instead of a `<Link>` avoids Next 15's soft RSC
+   * navigation on same-path query-only changes — which is what made the
+   * second tag click feel 3-5s slow. State updates now stay client-only.
    */
-  function tagHref(slug: string): string {
-    const isActive = activeTagSet.has(slug);
-    const nextTags = isActive
-      ? activeTags.filter((s) => s !== slug)
-      : [...activeTags, slug];
-    return buildCategoryUrl({
-      view: "feed",
-      model: activeModel,
-      platform: activePlatform,
-      tags: nextTags,
-      sort: activeSort,
-      q: activeQ,
-    });
-  }
+  const onToggleTag = useCallback(
+    (slug: string) => {
+      const isActive = activeTagSet.has(slug);
+      const nextTags = isActive
+        ? activeTags.filter((s) => s !== slug)
+        : [...activeTags, slug];
+      setFilter({ tags: nextTags });
+    },
+    [activeTagSet, activeTags, setFilter],
+  );
 
-  /** URL with every selected tag stripped (model/platform/sort/q kept). */
-  const clearAllTagsHref = buildCategoryUrl({
-    view: "feed",
-    model: activeModel,
-    platform: activePlatform,
-    tags: [],
-    sort: activeSort,
-    q: activeQ,
-  });
+  const onClearTags = useCallback(() => {
+    setFilter({ tags: [] });
+  }, [setFilter]);
+
+  const onSetTagsMode = useCallback(
+    (mode: TagsMatchMode) => {
+      setFilter({ tagsMode: mode });
+    },
+    [setFilter],
+  );
 
   return (
     <div className={containerClass}>
@@ -249,8 +254,10 @@ export function SidebarBody({
       <TagsList
         tagsByAxis={tagsByAxis}
         activeTags={activeTagSet}
-        buildHref={tagHref}
-        clearAllHref={clearAllTagsHref}
+        tagsMode={state.tagsMode}
+        onToggleTag={onToggleTag}
+        onClearTags={onClearTags}
+        onSetTagsMode={onSetTagsMode}
       />
 
       <footer
@@ -387,8 +394,10 @@ function ModelsList({
 interface TagsListProps {
   tagsByAxis: TagsByAxis;
   activeTags: ReadonlySet<string>;
-  buildHref: (slug: string) => string;
-  clearAllHref: string;
+  tagsMode: TagsMatchMode;
+  onToggleTag: (slug: string) => void;
+  onClearTags: () => void;
+  onSetTagsMode: (mode: TagsMatchMode) => void;
 }
 
 /**
@@ -398,13 +407,21 @@ interface TagsListProps {
  * regardless of how the taxonomy grows.
  *
  * Selected tags surface ABOVE the tabs as removable chips so users always
- * see what's filtering them, even when browsing a different axis.
+ * see what's filtering them, even when browsing a different axis. The
+ * "All / Any" toggle that appears alongside the chips controls how the
+ * tag set composes (intersection vs union).
+ *
+ * Clicks fire `setFilter` directly (not `<Link>` navigations) — same path
+ * URL changes go through `history.replaceState`, so the masonry stays in
+ * place and there's no RSC refresh latency.
  */
 function TagsList({
   tagsByAxis,
   activeTags,
-  buildHref,
-  clearAllHref,
+  tagsMode,
+  onToggleTag,
+  onClearTags,
+  onSetTagsMode,
 }: TagsListProps) {
   const [axisTab, setAxisTab] = useState<TagAxis>("subject");
   const items = tagsByAxis[axisTab];
@@ -426,6 +443,11 @@ function TagsList({
     return list;
   }, [activeTags, allTagsBySlug]);
 
+  // The All/Any control is meaningful only when 2+ tags compose; with one
+  // tag they're identical. We still render it after the first selection so
+  // users can pre-pick the mode they want before stacking.
+  const showMatchToggle = selectedChips.length >= 1;
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2 px-2">
@@ -433,13 +455,13 @@ function TagsList({
           Tags
         </span>
         {selectedChips.length > 0 ? (
-          <Link
-            href={clearAllHref}
-            prefetch
-            className="text-[10px] font-medium text-text-subtle hover:text-text"
+          <button
+            type="button"
+            onClick={onClearTags}
+            className="text-[10px] font-medium text-text-subtle transition-colors hover:text-text"
           >
             Clear ({selectedChips.length})
-          </Link>
+          </button>
         ) : null}
       </div>
 
@@ -448,17 +470,56 @@ function TagsList({
       {selectedChips.length > 0 ? (
         <div className="flex flex-wrap gap-1 px-2">
           {selectedChips.map((tag) => (
-            <Link
+            <button
               key={tag.slug}
-              href={buildHref(tag.slug)}
-              prefetch
-              className="group inline-flex items-center gap-1 rounded-full border border-text bg-text px-2 py-[2px] text-[10.5px] font-semibold leading-none text-surface hover:opacity-90"
+              type="button"
+              onClick={() => onToggleTag(tag.slug)}
+              className="group inline-flex items-center gap-1 rounded-full border border-text bg-text px-2 py-[2px] text-[10.5px] font-semibold leading-none text-surface transition-opacity hover:opacity-90"
               title={`Remove ${tag.name}`}
             >
               <span>{tag.name}</span>
               <X className="h-2.5 w-2.5 opacity-80" strokeWidth={2.5} />
-            </Link>
+            </button>
           ))}
+        </div>
+      ) : null}
+
+      {showMatchToggle ? (
+        <div className="flex items-center justify-between gap-2 px-2">
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.22em] text-text-subtle">
+            Match
+          </span>
+          <div
+            role="radiogroup"
+            aria-label="Tag match mode"
+            className="inline-flex overflow-hidden rounded-full border text-[10px] font-semibold uppercase tracking-[0.14em]"
+          >
+            {(["all", "any"] as const).map((mode) => {
+              const active = tagsMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => onSetTagsMode(mode)}
+                  className={cn(
+                    "px-2.5 py-[3px] transition-colors",
+                    active
+                      ? "bg-text text-surface"
+                      : "bg-surface text-text-subtle hover:bg-hover hover:text-text",
+                  )}
+                  title={
+                    mode === "all"
+                      ? "Show only posts that carry every selected tag"
+                      : "Show posts that carry any of the selected tags"
+                  }
+                >
+                  {mode}
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
@@ -503,10 +564,10 @@ function TagsList({
         {items.map((tag) => {
           const active = activeTags.has(tag.slug);
           return (
-            <Link
+            <button
               key={tag.slug}
-              href={buildHref(tag.slug)}
-              prefetch
+              type="button"
+              onClick={() => onToggleTag(tag.slug)}
               aria-pressed={active}
               className={cn(
                 "inline-flex items-center gap-1 rounded-full border px-2 py-[3px] text-[11px] font-medium leading-none transition-colors",
@@ -524,7 +585,7 @@ function TagsList({
               >
                 {formatCount(tag.post_count)}
               </span>
-            </Link>
+            </button>
           );
         })}
       </div>

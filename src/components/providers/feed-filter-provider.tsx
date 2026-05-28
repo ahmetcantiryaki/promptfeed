@@ -10,9 +10,11 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { Model, Platform, PostSort } from "@/types/domain";
+import type { Model, Platform, PostSort, TagsMatchMode } from "@/types/domain";
+import { DEFAULT_TAGS_MATCH_MODE } from "@/types/domain";
 import {
   buildCategoryUrl,
+  decodeMatchParam,
   decodeTagParam,
   readPathFilter,
   type FeedView,
@@ -23,8 +25,10 @@ export type { FeedView } from "@/lib/category-url";
 export interface FeedFilterState {
   model?: string;
   platform?: string;
-  /** Selected tag slugs (multi-select; AND-intersected at query time). */
+  /** Selected tag slugs (multi). The composition mode is `tagsMode`. */
   tags: string[];
+  /** How the tag set composes: "all" intersects, "any" unions. */
+  tagsMode: TagsMatchMode;
   sort: PostSort;
   view: FeedView;
   folder?: string;
@@ -93,6 +97,7 @@ export function FeedFilterProvider({
       model: pf.model,
       platform: pf.platform,
       tags: decodeTagParam(sp.get("tag")),
+      tagsMode: decodeMatchParam(sp.get("match")),
       sort: pickSort(sp.get("sort")),
       view: pickView(sp.get("view")),
       folder: sp.get("folder") ?? undefined,
@@ -123,13 +128,20 @@ export function FeedFilterProvider({
           next.model = undefined;
           next.platform = undefined;
           next.tags = [];
+          next.tagsMode = DEFAULT_TAGS_MATCH_MODE;
           next.sort = "newest";
+        }
+        // Whenever the tag set empties the mode resets too — `match=any`
+        // with no tags is meaningless and would leak into URL builders.
+        if (next.tags.length === 0) {
+          next.tagsMode = DEFAULT_TAGS_MATCH_MODE;
         }
 
         const targetUrl = buildCategoryUrl({
           model: next.model,
           platform: next.platform,
           tags: next.tags,
+          tagsMode: next.tagsMode,
           sort: next.sort,
           q: next.q,
           view: next.view,
@@ -154,7 +166,12 @@ export function FeedFilterProvider({
   );
 
   const clearFilters = useCallback(() => {
-    setState({ sort: "newest", view: "feed", tags: [] });
+    setState({
+      sort: "newest",
+      view: "feed",
+      tags: [],
+      tagsMode: DEFAULT_TAGS_MATCH_MODE,
+    });
     router.push("/");
   }, [router]);
 

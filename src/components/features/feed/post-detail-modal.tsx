@@ -21,6 +21,7 @@ import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { prettyModel, prettyPlatform } from "@/lib/labels";
 import { useInteractions } from "@/components/providers/interactions-provider";
+import { useFeedFilter } from "@/components/providers/feed-filter-provider";
 import { tryParseJson, prettifyJson } from "@/lib/prompt-format";
 import { safeHref } from "@/lib/safe-url";
 import { trackPostView } from "@/lib/track-view";
@@ -46,8 +47,26 @@ export function PostDetailModal({
   onOpenChange,
 }: Props) {
   const { liked, saved, toggleLike, toggleSave } = useInteractions();
+  const { setFilter } = useFeedFilter();
   const isLiked = post ? liked.has(post.id) : false;
   const isSaved = post ? saved.has(post.id) : false;
+
+  /**
+   * Clicking a tag pill inside the modal jumps the feed to that single-tag
+   * filter and closes the modal — saved/liked view also gets reset so the
+   * user lands on the public feed regardless of where they were before.
+   */
+  const onTagClick = useMemo(
+    () => (slug: string) => {
+      setFilter({
+        view: "feed",
+        tags: [slug],
+        tagsMode: "all",
+      });
+      onOpenChange(false);
+    },
+    [setFilter, onOpenChange],
+  );
 
   // post.likes/shares already include the user's interaction (DB trigger),
   // so adjust the display only by the delta from the initial server state.
@@ -216,7 +235,10 @@ export function PostDetailModal({
                     </Field>
                     {post.tag_slugs && post.tag_slugs.length > 0 ? (
                       <Field label="Tags">
-                        <TagPillsRow slugs={post.tag_slugs} />
+                        <TagPillsRow
+                          slugs={post.tag_slugs}
+                          onTagClick={onTagClick}
+                        />
                       </Field>
                     ) : null}
                   </div>

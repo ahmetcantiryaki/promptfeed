@@ -14,7 +14,8 @@
  * arguments. Builders never need that.
  */
 
-import type { PostSort } from "@/types/domain";
+import type { PostSort, TagsMatchMode } from "@/types/domain";
+import { DEFAULT_TAGS_MATCH_MODE, isTagsMatchMode } from "@/types/domain";
 
 export type FeedView = "feed" | "saved" | "liked";
 
@@ -23,6 +24,8 @@ export interface CategoryFilter {
   platform?: string;
   /** Selected tag slugs (multi). Encoded as `?tag=slug1,slug2`. */
   tags?: string[];
+  /** AND vs OR composition for the tag set. Default "all" omits the param. */
+  tagsMode?: TagsMatchMode;
   sort?: PostSort;
   q?: string;
   view?: FeedView;
@@ -47,6 +50,14 @@ export function decodeTagParam(raw: string | null | undefined): string[] {
     .filter((s) => /^[a-z0-9-]+$/.test(s));
 }
 
+/** Read `?match=any|all`. Anything else falls back to the default ("all"). */
+export function decodeMatchParam(
+  raw: string | null | undefined,
+): TagsMatchMode {
+  if (isTagsMatchMode(raw)) return raw;
+  return DEFAULT_TAGS_MATCH_MODE;
+}
+
 export function buildCategoryUrl(f: CategoryFilter): string {
   if (f.view === "liked" || f.view === "saved") {
     const params = new URLSearchParams();
@@ -65,6 +76,16 @@ export function buildCategoryUrl(f: CategoryFilter): string {
   if (f.q && f.q.trim()) params.set("q", f.q.trim());
   const tagParam = encodeTagParam(f.tags);
   if (tagParam) params.set("tag", tagParam);
+  // Only persist `match` when both (a) a non-default mode is set AND (b)
+  // there are tags to compose — match=any with zero tags is meaningless.
+  if (
+    f.tagsMode &&
+    f.tagsMode !== DEFAULT_TAGS_MATCH_MODE &&
+    f.tags &&
+    f.tags.length > 0
+  ) {
+    params.set("match", f.tagsMode);
+  }
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
 }

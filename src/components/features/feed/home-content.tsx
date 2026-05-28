@@ -86,13 +86,26 @@ function filterAndSortPosts(
   const model = state.model;
   const platform = state.platform;
 
+  const mode = state.tagsMode;
+
   const filtered = posts.filter((p) => {
     if (model && p.model_slug !== model) return false;
     if (platform && p.platform_slug !== platform) return false;
     if (requiredTags) {
       const slugs = p.tag_slugs ?? [];
-      for (const required of requiredTags) {
-        if (!slugs.includes(required)) return false;
+      if (mode === "any") {
+        let hit = false;
+        for (const candidate of requiredTags) {
+          if (slugs.includes(candidate)) {
+            hit = true;
+            break;
+          }
+        }
+        if (!hit) return false;
+      } else {
+        for (const required of requiredTags) {
+          if (!slugs.includes(required)) return false;
+        }
       }
     }
     if (termRe) {
@@ -200,6 +213,26 @@ export function HomeContent({
   const filteredPosts = useMemo(
     () => filterAndSortPosts(allPosts, state),
     [allPosts, state],
+  );
+
+  // Headline counts that track the active filter. Lets the StatsStrip
+  // surface "127 prompts, 3 models, 2 platforms" instead of static totals
+  // so the user can see how restrictive the current combination is.
+  const filteredStats = useMemo(() => {
+    const modelSet = new Set<string>();
+    const platformSet = new Set<string>();
+    for (const p of filteredPosts) {
+      modelSet.add(p.model_slug);
+      platformSet.add(p.platform_slug);
+    }
+    return {
+      prompts: filteredPosts.length,
+      models: modelSet.size,
+      platforms: platformSet.size,
+    };
+  }, [filteredPosts]);
+  const isFiltering = Boolean(
+    state.model || state.platform || state.tags.length > 0 || state.q,
   );
 
   // Windowed slice — reveal more on scroll without paying the cost of
@@ -340,7 +373,7 @@ export function HomeContent({
 
       <div className="px-3 pb-10 pt-4 sm:px-5 sm:pt-6 lg:px-7">
         {state.view === "feed" ? (
-          <StatsStrip models={models} platforms={platforms} />
+          <StatsStrip stats={filteredStats} filtering={isFiltering} />
         ) : null}
         {state.view === "saved" ? (
           <SavedHeader detail={folderDetail} folders={folders ?? []} />
@@ -604,19 +637,12 @@ function FoldersSkeletonGrid() {
   );
 }
 
-function StatsStrip({
-  models,
-  platforms,
-}: {
-  models: Model[];
-  platforms: Platform[];
-}) {
-  const totalPrompts = useMemo(
-    () => models.reduce((sum, m) => sum + (m.post_count ?? 0), 0),
-    [models],
-  );
-  const modelCount = models.length;
-  const platformCount = platforms.length;
+interface StatsStripProps {
+  stats: { prompts: number; models: number; platforms: number };
+  filtering: boolean;
+}
+
+function StatsStrip({ stats, filtering }: StatsStripProps) {
   const items: Array<{
     label: string;
     value: number;
@@ -624,17 +650,17 @@ function StatsStrip({
   }> = [
     {
       label: "Prompts",
-      value: totalPrompts,
+      value: stats.prompts,
       icon: <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />,
     },
     {
       label: "Models",
-      value: modelCount,
+      value: stats.models,
       icon: <Cpu className="h-3.5 w-3.5" strokeWidth={2} />,
     },
     {
       label: "Platforms",
-      value: platformCount,
+      value: stats.platforms,
       icon: <Globe className="h-3.5 w-3.5" strokeWidth={2} />,
     },
   ];
@@ -643,7 +669,7 @@ function StatsStrip({
       {items.map((it) => (
         <span
           key={it.label}
-          className="inline-flex items-center gap-1.5 rounded-full border bg-surface-2/60 px-2.5 py-1 text-[12px] font-medium text-text-muted"
+          className="inline-flex items-center gap-1.5 rounded-full border bg-surface-2/60 px-2.5 py-1 text-[12px] font-medium text-text-muted transition-colors"
         >
           <span className="text-text-subtle">{it.icon}</span>
           <span className="font-semibold tabular-nums text-text">
@@ -652,6 +678,14 @@ function StatsStrip({
           <span>{it.label}</span>
         </span>
       ))}
+      {filtering ? (
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-accent"
+          aria-live="polite"
+        >
+          Filtered
+        </span>
+      ) : null}
     </div>
   );
 }
