@@ -5,6 +5,10 @@ import { cn } from "@/lib/utils";
 
 interface LazyImageProps {
   src: string;
+  /** Lower-resolution URL to swap in when `src` fails to load. Used by
+   *  the masonry cards to upgrade thumbnails to a 2x-density variant
+   *  while still serving the recorded original on a 404. */
+  fallbackSrc?: string;
   alt: string;
   /** Wrapper class. The wrapper is the layout-driving element. */
   className?: string;
@@ -23,6 +27,7 @@ interface LazyImageProps {
 
 export function LazyImage({
   src,
+  fallbackSrc,
   alt,
   className,
   imgClassName,
@@ -35,6 +40,19 @@ export function LazyImage({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
+  // Track which URL the <img> is actually attempting. Starts with `src`
+  // and gets swapped to `fallbackSrc` on a 404 (one-shot, no retry loop).
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const triedFallbackRef = useRef(false);
+
+  // Reset attempt state whenever the caller passes a different `src`
+  // (post-cards reuse the same component across feed changes).
+  useEffect(() => {
+    triedFallbackRef.current = false;
+    setCurrentSrc(src);
+    setErrored(false);
+    setLoaded(false);
+  }, [src]);
 
   // If the image is already cached/decoded by the time React mounts, the
   // `onLoad` event will never fire — flip to loaded synchronously.
@@ -45,12 +63,21 @@ export function LazyImage({
       setLoaded(true);
       onLoadComplete?.();
     }
-  }, [src, onLoadComplete]);
+  }, [currentSrc, onLoadComplete]);
 
   function handleLoad(e: SyntheticEvent<HTMLImageElement>) {
     if (e.currentTarget.naturalWidth === 0) return;
     setLoaded(true);
     onLoadComplete?.();
+  }
+
+  function handleError() {
+    if (fallbackSrc && !triedFallbackRef.current && fallbackSrc !== currentSrc) {
+      triedFallbackRef.current = true;
+      setCurrentSrc(fallbackSrc);
+      return;
+    }
+    setErrored(true);
   }
 
   return (
@@ -83,12 +110,12 @@ export function LazyImage({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={imgRef}
-        src={src}
+        src={currentSrc}
         alt={alt}
         loading={loading}
         draggable={draggable}
         onLoad={handleLoad}
-        onError={() => setErrored(true)}
+        onError={handleError}
         className={cn(
           "block h-auto w-full transition-opacity duration-500 ease-out",
           loaded ? "opacity-100" : "opacity-0",

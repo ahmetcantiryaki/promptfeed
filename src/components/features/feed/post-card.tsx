@@ -15,6 +15,7 @@ import { cn, formatCount } from "@/lib/utils";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { LazyImage } from "@/components/ui/lazy-image";
 import { prettyModel } from "@/lib/labels";
+import { upgradeThumbnailSrc } from "@/lib/image-srcset";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { PostCardMenu } from "./post-card-menu";
 import { RemixCurtain } from "./remix-curtain";
@@ -58,10 +59,19 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
   );
   const hasExtras = !isRemix && extraImages.length > 0;
 
+  // Recorded thumbnail (`-300x...` for YouMind-sourced posts) is too low
+  // res for 2x DPR cards, so we attempt the larger `-600x...` variant
+  // first and let LazyImage fall back to the original URL if that 404s.
+  const baseThumb = post.thumbnail_url ?? post.media_url;
+  const upgradedThumb = useMemo(
+    () => upgradeThumbnailSrc(baseThumb),
+    [baseThumb],
+  );
+
   const allImages = useMemo(() => {
     if (isRemix) return [] as string[];
-    return [post.thumbnail_url ?? post.media_url, ...extraImages];
-  }, [isRemix, post.thumbnail_url, post.media_url, extraImages]);
+    return [upgradedThumb, ...extraImages];
+  }, [isRemix, upgradedThumb, extraImages]);
 
   return (
     <PostContextMenuWrapper post={post} onOpenDetail={onOpen}>
@@ -74,10 +84,15 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
           onClickArea={onOpen}
         />
       ) : hasExtras ? (
-        <AutoSlider images={allImages} alt={post.prompt.slice(0, 80)} />
+        <AutoSlider
+          images={allImages}
+          fallbackFirst={baseThumb !== upgradedThumb ? baseThumb : undefined}
+          alt={post.prompt.slice(0, 80)}
+        />
       ) : (
         <LazyImage
-          src={post.thumbnail_url ?? post.media_url}
+          src={upgradedThumb}
+          fallbackSrc={baseThumb !== upgradedThumb ? baseThumb : undefined}
           alt={post.prompt.slice(0, 80)}
           minHeight={200}
           imgClassName="transition-transform duration-500 ease-out group-hover:scale-[1.04]"
@@ -170,7 +185,15 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
   );
 }
 
-function AutoSlider({ images, alt }: { images: string[]; alt: string }) {
+function AutoSlider({
+  images,
+  fallbackFirst,
+  alt,
+}: {
+  images: string[];
+  fallbackFirst?: string;
+  alt: string;
+}) {
   const [idx, setIdx] = useState(0);
   const [hover, setHover] = useState(false);
 
@@ -193,6 +216,7 @@ function AutoSlider({ images, alt }: { images: string[]; alt: string }) {
       {/* Base image — drives the card height */}
       <LazyImage
         src={first ?? ""}
+        fallbackSrc={fallbackFirst}
         alt={alt}
         minHeight={200}
         imgClassName={cn(
