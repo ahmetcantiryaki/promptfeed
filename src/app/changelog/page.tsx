@@ -15,20 +15,26 @@ const INK = "#0A0A0A";
 const PAPER = "#F5F1E8";
 
 export const metadata: Metadata = {
-  title: "Dispatch — what shipped",
+  // Title and description tuned to the social-card sweet spot
+  // (title 50–60 chars, description 110–160 chars). The OG image is
+  // resolved automatically from opengraph-image.tsx co-located with
+  // this page — no manual `images` field needed.
+  title: "Dispatch — what shipped on Feedlens.ai",
   description:
-    "The Feedlens dispatch. Every release, written like it matters — what changed, why, and what's next on the desk.",
+    "The Feedlens dispatch. Every release of the AI image prompt discovery feed, written like it matters — what changed, why, and what's next on the desk.",
   alternates: { canonical: "/changelog" },
   openGraph: {
-    title: "Feedlens Dispatch — what shipped",
+    title: "Feedlens Dispatch — every release of the AI prompt feed",
     description:
-      "Issue-by-issue release notes for Feedlens.ai. Editorially curated, monospaced where it counts.",
+      "Issue-by-issue release notes for Feedlens.ai — the AI image prompt discovery feed. Editorially curated, monospaced where it counts, illustrated where it matters.",
     type: "article",
+    url: "/changelog",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Feedlens Dispatch",
-    description: "What shipped, told issue by issue.",
+    title: "Feedlens Dispatch — every release of the AI prompt feed",
+    description:
+      "Issue-by-issue release notes for Feedlens.ai — the AI image prompt discovery feed. Editorially curated, monospaced where it counts.",
   },
 };
 
