@@ -23,6 +23,7 @@ import type {
 } from "@/types/domain";
 import { TAG_AXES, TAG_AXIS_LABEL } from "@/types/domain";
 import { FilterDropdown, type FilterOption } from "./filter-dropdown";
+import { FiltersDropdown } from "./filters-dropdown";
 import { GridSizeSelector } from "./grid-size-selector";
 import { MobileGridSizeSelector } from "./mobile-grid-size-selector";
 import { useFeedFilter } from "@/components/providers/feed-filter-provider";
@@ -151,6 +152,7 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
             setFilter({ sort: (v as PostSort | undefined) ?? "newest" })
           }
         />
+        <FiltersDropdown />
         <label className="flex w-[240px] items-center gap-2 rounded-[10px] border bg-surface-2 px-3 py-1.5 transition-all focus-within:w-[320px] focus-within:border-border-strong">
           <Search
             className="h-3.5 w-3.5 shrink-0 text-text-subtle"

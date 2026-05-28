@@ -1,21 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Compass,
-  Bookmark,
-  Heart,
-  SlidersHorizontal,
-  ChevronDown,
-} from "lucide-react";
-import type {
-  Model,
-  Platform,
-  TagsByAxis,
-  TagsMatchMode,
-} from "@/types/domain";
+import { Compass, Bookmark, Heart } from "lucide-react";
+import type { Model, Platform, TagsByAxis } from "@/types/domain";
 import { LogoMark } from "@/components/ui/logo-mark";
 import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
@@ -26,7 +14,6 @@ import {
 } from "@/components/providers/feed-filter-provider";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { buildCategoryUrl } from "@/lib/category-url";
-import { TagsFilterPanel } from "@/components/features/filter-bar/tags-filter-panel";
 
 function OtherBadge({ size = 20 }: { size?: number }) {
   return <PlatformBadge platform="web" size={size} />;
@@ -108,7 +95,6 @@ export function Sidebar({
 export function SidebarBody({
   models,
   platforms,
-  tagsByAxis,
   savedCount,
   likedCount,
   variant = "rail",
@@ -116,11 +102,6 @@ export function SidebarBody({
   const pathname = usePathname();
   const { state, setFilter } = useFeedFilter();
   const { isAuthed, liked, saved, requestSignInForNav } = useInteractions();
-  // Tags live behind a collapsible "Filters" button so the rail stays short.
-  // Auto-open when a tag filter is already active so it isn't hidden.
-  const [showFilters, setShowFilters] = useState(
-    () => state.view === "feed" && state.tags.length > 0,
-  );
   // Live counts: prefer client-side state once authed so toggling like/save
   // updates the badge immediately. Falls back to SSR-passed props for the
   // initial render of anonymous users.
@@ -142,7 +123,6 @@ export function SidebarBody({
   const activeSort = state.view === "feed" ? state.sort : "newest";
   const activeQ = state.view === "feed" ? state.q : undefined;
   const activeMediaType = state.view === "feed" ? state.mediaType : undefined;
-  const activeTagSet = new Set(activeTags);
 
   function modelHref(slug: string): string {
     const isActive = activeModel === slug;
@@ -169,34 +149,6 @@ export function SidebarBody({
       mediaType: activeMediaType,
     });
   }
-
-  /**
-   * Toggle a tag through the provider. Going via `setFilter` (button +
-   * history.replaceState) instead of a `<Link>` avoids Next 15's soft RSC
-   * navigation on same-path query-only changes — which is what made the
-   * second tag click feel 3-5s slow. State updates now stay client-only.
-   */
-  const onToggleTag = useCallback(
-    (slug: string) => {
-      const isActive = activeTagSet.has(slug);
-      const nextTags = isActive
-        ? activeTags.filter((s) => s !== slug)
-        : [...activeTags, slug];
-      setFilter({ tags: nextTags });
-    },
-    [activeTagSet, activeTags, setFilter],
-  );
-
-  const onClearTags = useCallback(() => {
-    setFilter({ tags: [] });
-  }, [setFilter]);
-
-  const onSetTagsMode = useCallback(
-    (mode: TagsMatchMode) => {
-      setFilter({ tagsMode: mode });
-    },
-    [setFilter],
-  );
 
   return (
     <div className={containerClass}>
@@ -244,54 +196,6 @@ export function SidebarBody({
           );
         })}
       </nav>
-
-      {/* Collapsible Filters (tags) — sits right under Saved; closed by
-          default to keep the rail short, opens on click. */}
-      <div className="flex flex-col gap-1.5">
-        <button
-          type="button"
-          onClick={() => setShowFilters((v) => !v)}
-          aria-expanded={showFilters}
-          className={cn(
-            "flex items-center gap-2.5 rounded-[8px] border px-2.5 text-[14px] transition-colors",
-            itemPaddingY,
-            showFilters
-              ? "border-border-strong bg-surface-2 text-text"
-              : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
-          )}
-        >
-          <SlidersHorizontal
-            className="h-[17px] w-[17px] shrink-0"
-            strokeWidth={1.8}
-          />
-          <span className="flex-1 text-left font-medium">Filters</span>
-          {activeTags.length > 0 ? (
-            <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-text px-1.5 text-[10px] font-bold tabular-nums text-bg">
-              {activeTags.length}
-            </span>
-          ) : null}
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 transition-transform",
-              showFilters ? "rotate-0" : "-rotate-90",
-            )}
-            strokeWidth={2}
-          />
-        </button>
-        {showFilters ? (
-          <div className="rounded-[10px] border bg-surface-2/40 p-2.5">
-            <TagsFilterPanel
-              tagsByAxis={tagsByAxis}
-              activeTags={activeTagSet}
-              tagsMode={state.tagsMode}
-              onToggleTag={onToggleTag}
-              onClearTags={onClearTags}
-              onSetTagsMode={onSetTagsMode}
-              density="compact"
-            />
-          </div>
-        ) : null}
-      </div>
 
       <ModelsList
         items={(activeMediaType
