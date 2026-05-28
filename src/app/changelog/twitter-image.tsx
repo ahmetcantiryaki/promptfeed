@@ -73,7 +73,7 @@ export default async function Image() {
             style={{
               display: "flex",
               flexDirection: "column",
-              width: 380,
+              width: 360,
             }}
           >
             <div
@@ -82,9 +82,9 @@ export default async function Image() {
                 fontFamily: "Fraunces",
                 fontStyle: "italic",
                 fontWeight: 900,
-                fontSize: 340,
-                lineHeight: 0.82,
-                letterSpacing: "-0.045em",
+                fontSize: 200,
+                lineHeight: 0.86,
+                letterSpacing: "-0.05em",
                 color: INK,
               }}
             >
