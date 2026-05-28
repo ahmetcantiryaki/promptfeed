@@ -10,11 +10,18 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { Model, Platform, PostSort, TagsMatchMode } from "@/types/domain";
+import type {
+  MediaType,
+  Model,
+  Platform,
+  PostSort,
+  TagsMatchMode,
+} from "@/types/domain";
 import { DEFAULT_TAGS_MATCH_MODE } from "@/types/domain";
 import {
   buildCategoryUrl,
   decodeMatchParam,
+  decodeMediaTypeParam,
   decodeTagParam,
   readPathFilter,
   type FeedView,
@@ -29,6 +36,8 @@ export interface FeedFilterState {
   tags: string[];
   /** How the tag set composes: "all" intersects, "any" unions. */
   tagsMode: TagsMatchMode;
+  /** "image" / "video" / undefined (= both). */
+  mediaType?: MediaType;
   sort: PostSort;
   view: FeedView;
   folder?: string;
@@ -98,6 +107,7 @@ export function FeedFilterProvider({
       platform: pf.platform,
       tags: decodeTagParam(sp.get("tag")),
       tagsMode: decodeMatchParam(sp.get("match")),
+      mediaType: decodeMediaTypeParam(sp.get("type")),
       sort: pickSort(sp.get("sort")),
       view: pickView(sp.get("view")),
       folder: sp.get("folder") ?? undefined,
@@ -129,6 +139,7 @@ export function FeedFilterProvider({
           next.platform = undefined;
           next.tags = [];
           next.tagsMode = DEFAULT_TAGS_MATCH_MODE;
+          next.mediaType = undefined;
           next.sort = "newest";
         }
         // Whenever the tag set empties the mode resets too — `match=any`
@@ -142,6 +153,7 @@ export function FeedFilterProvider({
           platform: next.platform,
           tags: next.tags,
           tagsMode: next.tagsMode,
+          mediaType: next.mediaType,
           sort: next.sort,
           q: next.q,
           view: next.view,

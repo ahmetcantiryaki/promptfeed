@@ -14,6 +14,7 @@ import type { OwnerInfo } from "@/lib/posts";
 import { cn, formatCount } from "@/lib/utils";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { LazyImage } from "@/components/ui/lazy-image";
+import { VideoCardPreview } from "@/components/ui/video-card-preview";
 import { prettyModel } from "@/lib/labels";
 import { buildThumbCandidates } from "@/lib/image-srcset";
 import { useInteractions } from "@/components/providers/interactions-provider";
@@ -51,13 +52,16 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
     post.shares + (isSaved ? 1 : 0) - (initialSavedRef.current ? 1 : 0);
   const viewCount = (post as Post & { views?: number | null }).views ?? 0;
 
+  const isVideo = post.media_type === "video";
   const isRemix =
-    post.prompt_type === "remix" && Boolean(post.source_image_url);
+    !isVideo &&
+    post.prompt_type === "remix" &&
+    Boolean(post.source_image_url);
   const extraImages = useMemo(
-    () => post.extra_image_urls ?? [],
-    [post.extra_image_urls],
+    () => (isVideo ? [] : post.extra_image_urls ?? []),
+    [isVideo, post.extra_image_urls],
   );
-  const hasExtras = !isRemix && extraImages.length > 0;
+  const hasExtras = !isRemix && !isVideo && extraImages.length > 0;
 
   // Recorded thumbnail (`-300x...` for YouMind-sourced posts, default
   // small variant for Twitter posts) is too low-res for 2x DPR cards.
@@ -78,7 +82,14 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
   return (
     <PostContextMenuWrapper post={post} onOpenDetail={onOpen}>
       <article className="group relative overflow-hidden rounded-[12px] bg-surface-2">
-      {isRemix ? (
+      {isVideo ? (
+        <VideoCardPreview
+          poster={thumbCandidates.primary}
+          aspectRatio={post.aspect_ratio}
+          durationSeconds={post.duration_seconds}
+          alt={post.prompt.slice(0, 80)}
+        />
+      ) : isRemix ? (
         <RemixCurtain
           inputUrl={post.source_image_url as string}
           outputUrl={post.media_url}

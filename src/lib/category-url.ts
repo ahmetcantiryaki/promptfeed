@@ -14,7 +14,7 @@
  * arguments. Builders never need that.
  */
 
-import type { PostSort, TagsMatchMode } from "@/types/domain";
+import type { MediaType, PostSort, TagsMatchMode } from "@/types/domain";
 import { DEFAULT_TAGS_MATCH_MODE, isTagsMatchMode } from "@/types/domain";
 
 export type FeedView = "feed" | "saved" | "liked";
@@ -26,6 +26,8 @@ export interface CategoryFilter {
   tags?: string[];
   /** AND vs OR composition for the tag set. Default "all" omits the param. */
   tagsMode?: TagsMatchMode;
+  /** Image / video filter. Undefined = both (the new default). */
+  mediaType?: MediaType;
   sort?: PostSort;
   q?: string;
   view?: FeedView;
@@ -58,6 +60,14 @@ export function decodeMatchParam(
   return DEFAULT_TAGS_MATCH_MODE;
 }
 
+/** Read `?type=image|video`. Anything else returns undefined (= both). */
+export function decodeMediaTypeParam(
+  raw: string | null | undefined,
+): MediaType | undefined {
+  if (raw === "image" || raw === "video") return raw;
+  return undefined;
+}
+
 export function buildCategoryUrl(f: CategoryFilter): string {
   if (f.view === "liked" || f.view === "saved") {
     const params = new URLSearchParams();
@@ -86,6 +96,7 @@ export function buildCategoryUrl(f: CategoryFilter): string {
   ) {
     params.set("match", f.tagsMode);
   }
+  if (f.mediaType) params.set("type", f.mediaType);
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
 }

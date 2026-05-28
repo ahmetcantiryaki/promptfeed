@@ -89,6 +89,7 @@ function filterAndSortPosts(
   const mode = state.tagsMode;
 
   const filtered = posts.filter((p) => {
+    if (state.mediaType && p.media_type !== state.mediaType) return false;
     if (model && p.model_slug !== model) return false;
     if (platform && p.platform_slug !== platform) return false;
     if (requiredTags) {
@@ -232,7 +233,11 @@ export function HomeContent({
     };
   }, [filteredPosts]);
   const isFiltering = Boolean(
-    state.model || state.platform || state.tags.length > 0 || state.q,
+    state.model ||
+      state.platform ||
+      state.tags.length > 0 ||
+      state.q ||
+      state.mediaType,
   );
 
   // Windowed slice — reveal more on scroll without paying the cost of

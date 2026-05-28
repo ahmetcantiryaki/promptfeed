@@ -89,10 +89,11 @@ function escapeIlike(s: string): string {
  */
 export async function listAllPostsForFeed(limit = 2000): Promise<Post[]> {
   const supabase = await createClient();
+  // Both image and video posts ride the same discover stream; the client
+  // narrows by `state.mediaType` in memory.
   const { data, error } = await supabase
     .from("posts")
     .select(POSTS_WITH_TAGS_SELECT)
-    .eq("media_type", "image")
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(limit);
@@ -116,7 +117,9 @@ export async function listPosts(filters: PostFilters = {}): Promise<Post[]> {
     query = query.in("id", tagIds);
   }
 
-  query = query.eq("media_type", filters.mediaType ?? "image");
+  if (filters.mediaType) {
+    query = query.eq("media_type", filters.mediaType);
+  }
 
   if (filters.model) {
     if (filters.model === OTHER_SLUG) {
@@ -191,10 +194,9 @@ async function _listModelsAndPlatforms(): Promise<{
   const [modelsRes, platformsRes, postSlugsRes] = await Promise.all([
     supabase.from("models").select("*"),
     supabase.from("platforms").select("*"),
-    supabase
-      .from("posts")
-      .select("model_slug, platform_slug")
-      .eq("media_type", "image"),
+    // Count over the whole corpus (image + video). Per-media counts can
+    // be derived client-side from the loaded feed if ever needed.
+    supabase.from("posts").select("model_slug, platform_slug"),
   ]);
   if (modelsRes.error) throw modelsRes.error;
   if (platformsRes.error) throw platformsRes.error;
@@ -361,7 +363,9 @@ export async function listPostsPaged(
     query = query.in("id", tagIds);
   }
 
-  query = query.eq("media_type", filters.mediaType ?? "image");
+  if (filters.mediaType) {
+    query = query.eq("media_type", filters.mediaType);
+  }
 
   if (filters.model) {
     if (filters.model === OTHER_SLUG) {

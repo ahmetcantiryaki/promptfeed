@@ -32,7 +32,11 @@ const securityHeaders = [
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       `connect-src 'self' https://accounts.google.com ${supabaseHostname ? `https://${supabaseHostname} wss://${supabaseHostname}` : ""}`.trim(),
-      "frame-src 'self' https://accounts.google.com",
+      // Allow any HTTPS frame so the pure-embed video player can iframe
+      // arbitrary provider URLs (YouTube, X, TikTok, Instagram, Reddit,
+      // Vimeo, and anything the scraper adds later) without an explicit
+      // per-host allowlist. Mirrors the `img-src https:` strategy.
+      "frame-src 'self' https:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

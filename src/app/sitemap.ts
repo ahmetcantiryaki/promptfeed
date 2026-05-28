@@ -12,10 +12,11 @@ interface SitemapPostRow {
 
 async function listSitemapPosts(limit = 5000): Promise<SitemapPostRow[]> {
   const supabase = await createClient();
+  // Includes both image and video prompt detail pages — every published
+  // post gets an indexable canonical URL.
   const { data, error } = await supabase
     .from("posts")
     .select("slug, created_at")
-    .eq("media_type", "image")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) return [];

@@ -247,8 +247,11 @@ export type Database = {
       }
       posts: {
         Row: {
+          aspect_ratio: number | null
           comments: number
           created_at: string
+          duration_seconds: number | null
+          embed_provider: string | null
           external_creator_handle: string | null
           external_creator_platform: string | null
           external_creator_url: string | null
@@ -274,8 +277,11 @@ export type Database = {
           views: number
         }
         Insert: {
+          aspect_ratio?: number | null
           comments?: number
           created_at?: string
+          duration_seconds?: number | null
+          embed_provider?: string | null
           external_creator_handle?: string | null
           external_creator_platform?: string | null
           external_creator_url?: string | null
@@ -301,8 +307,11 @@ export type Database = {
           views?: number
         }
         Update: {
+          aspect_ratio?: number | null
           comments?: number
           created_at?: string
+          duration_seconds?: number | null
+          embed_provider?: string | null
           external_creator_handle?: string | null
           external_creator_platform?: string | null
           external_creator_url?: string | null
