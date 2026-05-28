@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, Bookmark, Heart } from "lucide-react";
+import {
+  Compass,
+  Bookmark,
+  Heart,
+  SlidersHorizontal,
+  ChevronDown,
+} from "lucide-react";
 import type {
   Model,
   Platform,
@@ -110,6 +116,11 @@ export function SidebarBody({
   const pathname = usePathname();
   const { state, setFilter } = useFeedFilter();
   const { isAuthed, liked, saved, requestSignInForNav } = useInteractions();
+  // Tags live behind a collapsible "Filters" button so the rail stays short.
+  // Auto-open when a tag filter is already active so it isn't hidden.
+  const [showFilters, setShowFilters] = useState(
+    () => state.view === "feed" && state.tags.length > 0,
+  );
   // Live counts: prefer client-side state once authed so toggling like/save
   // updates the badge immediately. Falls back to SSR-passed props for the
   // initial render of anonymous users.
@@ -119,7 +130,7 @@ export function SidebarBody({
   const isDrawer = variant === "drawer";
 
   const containerClass =
-    "flex h-full min-h-0 flex-col gap-4 overflow-y-auto px-3 py-4";
+    "flex h-full min-h-0 flex-col gap-4 overflow-y-auto px-3 py-4 pf-soft-scroll";
   const itemPaddingY = isDrawer ? "py-2.5" : "py-[7px]";
 
   // The currently-active path filter — used both for highlighting AND for
@@ -234,6 +245,54 @@ export function SidebarBody({
         })}
       </nav>
 
+      {/* Collapsible Filters (tags) — sits right under Saved; closed by
+          default to keep the rail short, opens on click. */}
+      <div className="flex flex-col gap-1.5">
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          aria-expanded={showFilters}
+          className={cn(
+            "flex items-center gap-2.5 rounded-[8px] border px-2.5 text-[14px] transition-colors",
+            itemPaddingY,
+            showFilters
+              ? "border-border-strong bg-surface-2 text-text"
+              : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
+          )}
+        >
+          <SlidersHorizontal
+            className="h-[17px] w-[17px] shrink-0"
+            strokeWidth={1.8}
+          />
+          <span className="flex-1 text-left font-medium">Filters</span>
+          {activeTags.length > 0 ? (
+            <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-text px-1.5 text-[10px] font-bold tabular-nums text-bg">
+              {activeTags.length}
+            </span>
+          ) : null}
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 transition-transform",
+              showFilters ? "rotate-0" : "-rotate-90",
+            )}
+            strokeWidth={2}
+          />
+        </button>
+        {showFilters ? (
+          <div className="rounded-[10px] border bg-surface-2/40 p-2.5">
+            <TagsFilterPanel
+              tagsByAxis={tagsByAxis}
+              activeTags={activeTagSet}
+              tagsMode={state.tagsMode}
+              onToggleTag={onToggleTag}
+              onClearTags={onClearTags}
+              onSetTagsMode={onSetTagsMode}
+              density="compact"
+            />
+          </div>
+        ) : null}
+      </div>
+
       <ModelsList
         items={(activeMediaType
           ? models.filter((m) => m.kind === activeMediaType)
@@ -254,21 +313,6 @@ export function SidebarBody({
         itemPaddingY={itemPaddingY}
         buildHref={platformHref}
       />
-
-      <div className="flex flex-col gap-2">
-        <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-label">
-          Tags
-        </div>
-        <TagsFilterPanel
-          tagsByAxis={tagsByAxis}
-          activeTags={activeTagSet}
-          tagsMode={state.tagsMode}
-          onToggleTag={onToggleTag}
-          onClearTags={onClearTags}
-          onSetTagsMode={onSetTagsMode}
-          density="compact"
-        />
-      </div>
 
       <footer
         className={cn(
