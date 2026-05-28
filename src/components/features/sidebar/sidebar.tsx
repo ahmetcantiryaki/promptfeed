@@ -255,7 +255,7 @@ export function SidebarBody({
 
       <footer
         className={cn(
-          "mt-auto border-t px-2 text-[12px] text-text-subtle",
+          "mt-auto flex items-center justify-between gap-3 border-t px-2 text-[11.5px] text-text-subtle",
           isDrawer ? "pt-3" : "pt-2.5",
         )}
       >
@@ -267,6 +267,20 @@ export function SidebarBody({
         >
           © {new Date().getFullYear()} Feedlens.ai
         </span>
+        <Link
+          href="/changelog"
+          prefetch
+          className={cn(
+            "group inline-flex items-center gap-1.5 transition-colors hover:text-text",
+            isDrawer ? "min-h-10 py-2" : "",
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className="inline-block h-[5px] w-[5px] rounded-full bg-[#E63946]"
+          />
+          Changelog
+        </Link>
       </footer>
     </div>
   );
