@@ -279,61 +279,44 @@ export function TagsFilterPanel({
         )}
       </div>
 
-      {/* ── CART ZONE — only visible while there are selections ─ */}
-
+      {/* ── FOOTER CONTROLS — minimal, only when there are selections ─
+          Selected tags are already visually filled inside the chip grid
+          above and flagged via tab dots, so the bottom row holds nothing
+          but the two controls: the mode toggle (left, when 2+ tags) and
+          Clear (right, always present once any tag is on). No restated
+          chip strip, no "X selected" label — both were redundant readouts
+          that pushed the controls into awkward corners. */}
       {selectedChips.length > 0 ? (
-        <div className="mt-1 flex flex-col gap-1.5 border-t pt-2">
-          <div
-            className={cn(
-              "flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-medium uppercase tracking-[0.18em] text-text-subtle",
-              sidePad,
-            )}
-          >
-            <span className="tabular-nums">
-              {selectedChips.length} selected
-            </span>
-            {selectedChips.length >= 2 ? (
-              <>
-                <span aria-hidden="true" className="opacity-40">
-                  ·
-                </span>
-                <button
-                  type="button"
-                  onClick={onFlipMode}
-                  aria-label={`Match mode is ${tagsMode}; click to switch to ${otherMode}`}
-                  title={`Click to switch to "matching ${otherMode}"`}
-                  className="inline-flex items-center gap-1 normal-case tracking-normal text-text-muted transition-colors hover:text-text"
-                >
-                  <span>matching {tagsMode}</span>
-                  <ArrowLeftRight
-                    className="h-2.5 w-2.5 opacity-60"
-                    strokeWidth={2.5}
-                  />
-                </button>
-              </>
-            ) : null}
+        <div
+          className={cn(
+            "mt-1 flex items-center justify-between gap-2 border-t pt-2 pb-1 text-[10px] font-medium text-text-subtle",
+            sidePad,
+          )}
+        >
+          {selectedChips.length >= 2 ? (
             <button
               type="button"
-              onClick={onClearTags}
-              className="ml-auto normal-case tracking-normal text-text-subtle transition-colors hover:text-text"
+              onClick={onFlipMode}
+              aria-label={`Match mode is ${tagsMode}; click to switch to ${otherMode}`}
+              title={`Click to switch to "matching ${otherMode}"`}
+              className="inline-flex items-center gap-1 text-text-muted transition-colors hover:text-text"
             >
-              Clear
+              <span>matching {tagsMode}</span>
+              <ArrowLeftRight
+                className="h-2.5 w-2.5 opacity-60"
+                strokeWidth={2.5}
+              />
             </button>
-          </div>
-          <div className={cn("flex flex-wrap gap-1 pb-1", sidePad)}>
-            {selectedChips.map((tag) => (
-              <button
-                key={tag.slug}
-                type="button"
-                onClick={() => onToggleTag(tag.slug)}
-                className="inline-flex items-center gap-1 rounded-full border border-text bg-text px-2 py-[2px] text-[10.5px] font-semibold leading-none text-surface transition-opacity hover:opacity-90"
-                title={`Remove ${tag.name}`}
-              >
-                <span>{tag.name}</span>
-                <X className="h-2.5 w-2.5 opacity-80" strokeWidth={2.5} />
-              </button>
-            ))}
-          </div>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+          <button
+            type="button"
+            onClick={onClearTags}
+            className="uppercase tracking-[0.18em] transition-colors hover:text-text"
+          >
+            Clear
+          </button>
         </div>
       ) : null}
     </div>
