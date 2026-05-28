@@ -20,24 +20,51 @@
  * original full-size image.
  */
 export function upgradeThumbnailSrc(src: string): string {
-  if (!src) return src;
+  const { primary } = buildThumbCandidates(src);
+  return primary;
+}
 
-  // YouMind CDN: -300x<H>.<ext> → -600x<2H>.<ext>
+export interface ThumbCandidates {
+  /** Best-bet URL to try first. */
+  primary: string;
+  /** URLs to try in order if previous attempts 404. The recorded original
+   *  is always last, so the worst case still shows a (low-res) image. */
+  fallbacks: string[];
+}
+
+/**
+ * Build an ordered list of thumbnail URL candidates for a given source.
+ *
+ * YouMind's resize pipeline rounds the 2x height by ±1 inconsistently
+ * (e.g. `-300x217` resolves to `-600x435`, not the mathematically clean
+ * `-600x434`). A single computed URL therefore 404s for a non-trivial
+ * slice of posts. We try the exact double first, then ±1 to cover the
+ * rounding cases, then fall back to the recorded `-300x...` original.
+ *
+ * Twitter just needs `?name=large` swapped in.
+ */
+export function buildThumbCandidates(src: string): ThumbCandidates {
+  if (!src) return { primary: src, fallbacks: [] };
+
   if (src.includes("cms-assets.youmind.com")) {
-    return src.replace(
-      /-300x(\d+)\.(jpe?g|png|webp)$/i,
-      (_match, h: string, ext: string) =>
-        `-600x${parseInt(h, 10) * 2}.${ext}`,
-    );
+    const match = src.match(/^(.+)-300x(\d+)\.(jpe?g|png|webp)$/i);
+    if (!match) return { primary: src, fallbacks: [] };
+    const [, base, hStr, ext] = match;
+    const h = parseInt(hStr ?? "0", 10);
+    return {
+      primary: `${base}-600x${h * 2}.${ext}`,
+      fallbacks: [
+        `${base}-600x${h * 2 + 1}.${ext}`,
+        `${base}-600x${h * 2 - 1}.${ext}`,
+        src,
+      ],
+    };
   }
 
-  // Twitter: rewrite the query string to ?name=large for the biggest
-  // standard variant. Drop any existing query so we don't double-up or
-  // inherit a `name=small` from the scraper.
   if (src.includes("pbs.twimg.com")) {
     const base = src.split("?")[0] ?? src;
-    return `${base}?name=large`;
+    return { primary: `${base}?name=large`, fallbacks: [src] };
   }
 
-  return src;
+  return { primary: src, fallbacks: [] };
 }

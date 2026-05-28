@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { cn } from "@/lib/utils";
 
 interface LazyImageProps {
   src: string;
-  /** Lower-resolution URL to swap in when `src` fails to load. Used by
-   *  the masonry cards to upgrade thumbnails to a 2x-density variant
-   *  while still serving the recorded original on a 404. */
-  fallbackSrc?: string;
+  /** Ordered list of fallback URLs to try if `src` 404s. Cards use this
+   *  to handle CDN rounding quirks (e.g. YouMind's `-600x434` vs
+   *  `-600x435`) by listing every plausible variant. The recorded
+   *  original is expected at the end so the worst case still renders
+   *  a (low-res) image. */
+  fallbackSrcs?: readonly string[];
   alt: string;
   /** Wrapper class. The wrapper is the layout-driving element. */
   className?: string;
@@ -27,7 +29,7 @@ interface LazyImageProps {
 
 export function LazyImage({
   src,
-  fallbackSrc,
+  fallbackSrcs,
   alt,
   className,
   imgClassName,
@@ -40,19 +42,29 @@ export function LazyImage({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
-  // Track which URL the <img> is actually attempting. Starts with `src`
-  // and gets swapped to `fallbackSrc` on a 404 (one-shot, no retry loop).
-  const [currentSrc, setCurrentSrc] = useState(src);
-  const triedFallbackRef = useRef(false);
 
-  // Reset attempt state whenever the caller passes a different `src`
-  // (post-cards reuse the same component across feed changes).
+  // Build the full candidate chain — primary src then any fallbacks. We
+  // de-duplicate so the same URL isn't tried twice in a row when callers
+  // pass a fallback that happens to equal the primary.
+  const candidates = useMemo(() => {
+    const list = [src, ...(fallbackSrcs ?? [])].filter(Boolean);
+    const seen = new Set<string>();
+    return list.filter((u) => {
+      if (seen.has(u)) return false;
+      seen.add(u);
+      return true;
+    });
+  }, [src, fallbackSrcs]);
+
+  const [attemptIdx, setAttemptIdx] = useState(0);
+  const currentSrc = candidates[attemptIdx] ?? src;
+
+  // Reset attempts whenever the candidate list changes.
   useEffect(() => {
-    triedFallbackRef.current = false;
-    setCurrentSrc(src);
+    setAttemptIdx(0);
     setErrored(false);
     setLoaded(false);
-  }, [src]);
+  }, [candidates]);
 
   // If the image is already cached/decoded by the time React mounts, the
   // `onLoad` event will never fire — flip to loaded synchronously.
@@ -65,19 +77,28 @@ export function LazyImage({
     }
   }, [currentSrc, onLoadComplete]);
 
+  function tryNext() {
+    if (attemptIdx + 1 < candidates.length) {
+      setAttemptIdx(attemptIdx + 1);
+    } else {
+      setErrored(true);
+    }
+  }
+
   function handleLoad(e: SyntheticEvent<HTMLImageElement>) {
-    if (e.currentTarget.naturalWidth === 0) return;
+    // Some CDNs respond 200 with an empty body — treat the result as an
+    // error and move to the next candidate so the user doesn't sit on a
+    // permanent loading spinner.
+    if (e.currentTarget.naturalWidth === 0) {
+      tryNext();
+      return;
+    }
     setLoaded(true);
     onLoadComplete?.();
   }
 
   function handleError() {
-    if (fallbackSrc && !triedFallbackRef.current && fallbackSrc !== currentSrc) {
-      triedFallbackRef.current = true;
-      setCurrentSrc(fallbackSrc);
-      return;
-    }
-    setErrored(true);
+    tryNext();
   }
 
   return (
