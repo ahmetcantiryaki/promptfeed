@@ -28,7 +28,8 @@ import { trackPostView } from "@/lib/track-view";
 import { RemixCurtain } from "./remix-curtain";
 import { DetailImageSlider } from "./detail-image-slider";
 import { TagPillsRow } from "./tag-pills";
-import { VideoEmbedPlayer } from "@/components/ui/video-embed-player";
+import { VideoPlayer } from "@/components/ui/video-player";
+import { videoPosterUrl } from "@/lib/video";
 
 interface Props {
   post: Post | null;
@@ -176,15 +177,13 @@ export function PostDetailModal({
               <div className="relative w-full bg-black md:flex md:items-center md:justify-center md:overflow-hidden">
                 {post.media_type === "video" ? (
                   <div className="flex w-full items-center justify-center md:h-full">
-                    <div className="w-full md:max-h-full md:max-w-full">
-                      <VideoEmbedPlayer
-                        sourceUrl={post.source_url}
-                        provider={post.embed_provider}
-                        poster={post.thumbnail_url}
-                        aspectRatio={post.aspect_ratio}
-                        alt={post.prompt.slice(0, 80)}
-                      />
-                    </div>
+                    <VideoPlayer
+                      videoUrl={post.media_url}
+                      posterUrl={videoPosterUrl(post)}
+                      aspectRatio={post.aspect_ratio}
+                      sourceUrl={post.source_url}
+                      alt={post.prompt.slice(0, 80)}
+                    />
                   </div>
                 ) : post.prompt_type === "remix" && post.source_image_url ? (
                   <>

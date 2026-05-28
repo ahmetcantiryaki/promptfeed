@@ -1,56 +1,156 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { LazyImage } from "@/components/ui/lazy-image";
+import { cn } from "@/lib/utils";
+import { safeVideoSrc } from "@/lib/safe-url";
+import { firstFrameSrc } from "@/lib/video";
 
 interface Props {
-  poster: string;
-  /** Width / height ratio. Used for aspect-ratio reserve so masonry
-   *  doesn't reflow when the poster loads. Default 16/9. */
+  /** Direct video file URL (posts.media_url). */
+  videoUrl: string;
+  /** Poster image: the input image for image-to-video, or a recorded
+   *  poster for text-to-video. Null → render the first frame from the
+   *  video file itself. */
+  posterUrl: string | null;
+  /** Width / height ratio — reserves masonry space so the card doesn't
+   *  reflow when the poster/frame loads. Default 16/9. */
   aspectRatio?: number | null;
-  /** Total length in seconds — drives the "1:23" badge. Optional. */
+  /** Total length in seconds — drives the "0:12" in the corner badge. */
   durationSeconds?: number | null;
   alt: string;
 }
 
 /**
- * Static card representation for a video prompt. We deliberately don't
- * load the iframe here — embedding 30+ provider players in the masonry
- * would crater the page. The card shows the recorded poster, an inset
- * play overlay, and a duration badge; opening the detail modal loads
- * the actual iframe player.
+ * Static card visual for a video prompt. We deliberately never autoplay in
+ * the masonry (bandwidth + visual noise) — the card is a still poster with
+ * a small top-right play badge that signals "this is a video," and the
+ * surrounding PostCard overlay handles click-to-open. The real <video>
+ * plays in the detail modal.
+ *
+ *   image-to-video → poster is the input image (an <img>).
+ *   text-to-video  → poster is a recorded thumbnail when present, otherwise
+ *                    a muted, metadata-only <video> seeked to its first
+ *                    frame (so we still show "the first second" with no
+ *                    separate poster asset).
  */
 export function VideoCardPreview({
-  poster,
+  videoUrl,
+  posterUrl,
   aspectRatio,
   durationSeconds,
   alt,
 }: Props) {
   const ratio = aspectRatio && aspectRatio > 0 ? aspectRatio : 16 / 9;
+
   return (
     <div className="relative w-full">
-      <LazyImage
-        src={poster}
-        alt={alt}
-        aspectRatio={`${ratio}`}
-        minHeight={200}
-        imgClassName="transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-      />
-      <div
+      {posterUrl ? (
+        <LazyImage
+          src={posterUrl}
+          alt={alt}
+          aspectRatio={`${ratio}`}
+          minHeight={200}
+          imgClassName="transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+        />
+      ) : (
+        <FirstFrameVideo videoUrl={videoUrl} aspectRatio={ratio} alt={alt} />
+      )}
+
+      {/* Top-right "this is a video" badge — small play glyph + duration. */}
+      <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center"
+        className="pointer-events-none absolute right-2 top-2 z-30 inline-flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white backdrop-blur-md"
       >
-        <span className="grid h-14 w-14 place-items-center rounded-full bg-black/55 text-white backdrop-blur-md transition-transform duration-300 group-hover:scale-110 sm:h-16 sm:w-16">
-          <Play
-            className="h-6 w-6 translate-x-[2px] fill-white sm:h-7 sm:w-7"
-            strokeWidth={0}
-          />
-        </span>
-      </div>
-      {durationSeconds && durationSeconds > 0 ? (
-        <span className="pointer-events-none absolute bottom-2 right-2 z-30 inline-flex items-center rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white backdrop-blur">
-          {formatDuration(durationSeconds)}
-        </span>
+        <Play
+          className="h-3 w-3 translate-x-[0.5px] fill-white"
+          strokeWidth={0}
+        />
+        {durationSeconds && durationSeconds > 0 ? (
+          <span>{formatDuration(durationSeconds)}</span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Renders the first frame of a direct video file as a still, lazily — the
+ * <video> is only mounted once the card nears the viewport, and loads just
+ * metadata + the seeked-to frame (`#t=0.1`). Mirrors LazyImage's skeleton
+ * behaviour so a feed of text-to-video posts doesn't fetch dozens of files
+ * at once.
+ */
+function FirstFrameVideo({
+  videoUrl,
+  aspectRatio,
+  alt,
+}: {
+  videoUrl: string;
+  aspectRatio: number;
+  alt: string;
+}) {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const [inView, setInView] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [errored, setErrored] = useState(false);
+
+  const src = firstFrameSrc(safeVideoSrc(videoUrl));
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el || inView) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setInView(true);
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { rootMargin: "300px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [inView]);
+
+  return (
+    <div
+      ref={wrapperRef}
+      className="relative w-full overflow-hidden bg-surface-2"
+      style={{ aspectRatio: `${aspectRatio}` }}
+    >
+      {!ready && !errored && src ? (
+        <div className="absolute inset-0 z-10 animate-pulse bg-gradient-to-br from-surface-2 via-surface to-surface-2" />
+      ) : null}
+      {inView && src && !errored ? (
+        // eslint-disable-next-line jsx-a11y/media-has-caption
+        <video
+          src={src}
+          muted
+          playsInline
+          preload="metadata"
+          tabIndex={-1}
+          aria-label={alt}
+          // Safari doesn't reliably fire `loadeddata` for a preload=metadata
+          // frame seek, so flip ready on metadata too; `error` falls back to
+          // the unavailable state instead of a permanent skeleton.
+          onLoadedMetadata={() => setReady(true)}
+          onLoadedData={() => setReady(true)}
+          onError={() => setErrored(true)}
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-500 ease-out group-hover:scale-[1.04]",
+            ready ? "opacity-100" : "opacity-0",
+          )}
+        />
+      ) : null}
+      {src === null || errored ? (
+        <div className="absolute inset-0 z-10 grid place-items-center text-[11px] text-text-subtle">
+          Video unavailable
+        </div>
       ) : null}
     </div>
   );

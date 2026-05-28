@@ -30,12 +30,17 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com",
       "style-src 'self' 'unsafe-inline' https://accounts.google.com",
       "img-src 'self' data: blob: https:",
+      // Allow <video> to stream from any HTTPS host (direct-file video
+      // posts hotlink a provider/CDN .mp4/.webm) plus blob:/data: for
+      // local previews. SSRF is guarded at insert time via `safeVideoSrc`.
+      "media-src 'self' data: blob: https:",
       "font-src 'self' data:",
       `connect-src 'self' https://accounts.google.com ${supabaseHostname ? `https://${supabaseHostname} wss://${supabaseHostname}` : ""}`.trim(),
-      // Allow any HTTPS frame so the pure-embed video player can iframe
-      // arbitrary provider URLs (YouTube, X, TikTok, Instagram, Reddit,
-      // Vimeo, and anything the scraper adds later) without an explicit
-      // per-host allowlist. Mirrors the `img-src https:` strategy.
+      // frame-src is kept permissive for Google Identity Services (the
+      // sign-in flow frames accounts.google.com). Video no longer uses
+      // iframes — it's direct-file <video> now (see media-src above) — so
+      // this only serves auth; tighten to the exact GIS origins once
+      // verified against the live sign-in popup.
       "frame-src 'self' https:",
       "frame-ancestors 'none'",
       "base-uri 'self'",

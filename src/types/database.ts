@@ -39,6 +39,7 @@ export type Database = {
         Row: {
           created_at: string
           icon_url: string | null
+          kind: string
           name: string
           post_count: number
           slug: string
@@ -46,6 +47,7 @@ export type Database = {
         Insert: {
           created_at?: string
           icon_url?: string | null
+          kind?: string
           name: string
           post_count?: number
           slug: string
@@ -53,6 +55,7 @@ export type Database = {
         Update: {
           created_at?: string
           icon_url?: string | null
+          kind?: string
           name?: string
           post_count?: number
           slug?: string

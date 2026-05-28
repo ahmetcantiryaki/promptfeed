@@ -130,6 +130,10 @@ export function SidebarBody({
   const activeTags = state.view === "feed" ? state.tags : [];
   const activeSort = state.view === "feed" ? state.sort : "newest";
   const activeQ = state.view === "feed" ? state.q : undefined;
+  const activeMediaType = state.view === "feed" ? state.mediaType : undefined;
+  // Models shown depend on the active Gallery/Video mode so the rail lists
+  // only the relevant generators (and stays short).
+  const activeModelKind = activeMediaType ?? "image";
   const activeTagSet = new Set(activeTags);
 
   function modelHref(slug: string): string {
@@ -141,6 +145,7 @@ export function SidebarBody({
       tags: activeTags,
       sort: activeSort,
       q: activeQ,
+      mediaType: activeMediaType,
     });
   }
 
@@ -153,6 +158,7 @@ export function SidebarBody({
       tags: activeTags,
       sort: activeSort,
       q: activeQ,
+      mediaType: activeMediaType,
     });
   }
 
@@ -232,11 +238,13 @@ export function SidebarBody({
       </nav>
 
       <ModelsList
-        items={models.map((m) => ({
-          slug: m.slug,
-          name: m.name,
-          count: m.post_count,
-        }))}
+        items={models
+          .filter((m) => m.kind === activeModelKind)
+          .map((m) => ({
+            slug: m.slug,
+            name: m.name,
+            count: m.post_count,
+          }))}
         activeSlug={activeModel}
         itemPaddingY={itemPaddingY}
         buildHref={modelHref}

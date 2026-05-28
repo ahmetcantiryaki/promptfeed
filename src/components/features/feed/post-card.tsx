@@ -15,6 +15,7 @@ import { cn, formatCount } from "@/lib/utils";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { LazyImage } from "@/components/ui/lazy-image";
 import { VideoCardPreview } from "@/components/ui/video-card-preview";
+import { videoPosterUrl } from "@/lib/video";
 import { prettyModel } from "@/lib/labels";
 import { buildThumbCandidates } from "@/lib/image-srcset";
 import { useInteractions } from "@/components/providers/interactions-provider";
@@ -84,7 +85,8 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
       <article className="group relative overflow-hidden rounded-[12px] bg-surface-2">
       {isVideo ? (
         <VideoCardPreview
-          poster={thumbCandidates.primary}
+          videoUrl={post.media_url}
+          posterUrl={videoPosterUrl(post)}
           aspectRatio={post.aspect_ratio}
           durationSeconds={post.duration_seconds}
           alt={post.prompt.slice(0, 80)}

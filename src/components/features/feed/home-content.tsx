@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { formatCount } from "@/lib/utils";
 import type {
+  MediaType,
   Model,
   Platform,
   Post,
@@ -88,8 +89,13 @@ function filterAndSortPosts(
 
   const mode = state.tagsMode;
 
+  // Gallery/Video are separate modes, not an optional filter: an unset
+  // mediaType means the Gallery (image) tab, so the discover feed never
+  // mixes the two. The top-center switcher flips between them.
+  const mediaType: MediaType = state.mediaType ?? "image";
+
   const filtered = posts.filter((p) => {
-    if (state.mediaType && p.media_type !== state.mediaType) return false;
+    if (p.media_type !== mediaType) return false;
     if (model && p.model_slug !== model) return false;
     if (platform && p.platform_slug !== platform) return false;
     if (requiredTags) {
@@ -233,11 +239,7 @@ export function HomeContent({
     };
   }, [filteredPosts]);
   const isFiltering = Boolean(
-    state.model ||
-      state.platform ||
-      state.tags.length > 0 ||
-      state.q ||
-      state.mediaType,
+    state.model || state.platform || state.tags.length > 0 || state.q,
   );
 
   // Windowed slice — reveal more on scroll without paying the cost of

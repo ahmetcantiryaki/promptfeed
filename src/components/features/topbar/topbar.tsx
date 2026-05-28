@@ -12,7 +12,8 @@ import { MobileSidebarTrigger } from "@/components/features/sidebar/mobile-sideb
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
 import { AddPromptButton } from "./add-prompt-button";
-import { CreditsStrip, MobileLogoCredits } from "./credits-strip";
+import { CreditsStrip } from "./credits-strip";
+import { GalleryVideoSwitch } from "./gallery-video-switch";
 
 interface Props {
   user: User | null;
@@ -41,14 +42,16 @@ export function Topbar({
     <header className="flex h-[50px] shrink-0 items-center gap-2 border-b bg-surface px-3 sm:h-[60px] sm:gap-3 sm:px-6">
       <MobileSidebarTrigger />
 
-      {/* Mobile: logo ↔ credits rotator (left-aligned, fixed-size, never shifts) */}
-      <div className="flex flex-1 items-center justify-start md:hidden">
-        <MobileLogoCredits />
+      {/* Mobile: compact Gallery/Video switch, centered */}
+      <div className="flex flex-1 items-center justify-center md:hidden">
+        <GalleryVideoSwitch compact />
       </div>
 
-      {/* Desktop: inline credits + flex-1 spacer */}
+      {/* Desktop: inline credits + centered Gallery/Video switch */}
       <CreditsStrip />
-      <div className="hidden flex-1 md:block" />
+      <div className="hidden flex-1 items-center justify-center md:flex">
+        <GalleryVideoSwitch />
+      </div>
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
         {user ? (

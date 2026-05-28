@@ -20,6 +20,10 @@ const MODEL_LABELS: Record<string, string> = {
   "veo-3": "Veo 3",
   kling: "Kling",
   seedance: "Seedance",
+  "seedance-2-0": "Seedance 2.0",
+  "kling-o1": "Kling O1",
+  "kling-3-0": "Kling 3.0",
+  "veo-3-1": "Veo 3.1",
 };
 
 export function prettyPlatform(slug: string): string {

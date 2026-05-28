@@ -2,35 +2,6 @@ import type { Database } from "./database";
 
 export type MediaType = "image" | "video";
 
-/**
- * iframe-embed provider for video posts. Stored in `posts.embed_provider`
- * so the renderer can pick the right iframe builder without re-parsing
- * the source URL on every render.
- *
- *   "native" — direct <video src=…> from a raw MP4/WebM URL (rare; most
- *              social videos come from one of the named providers).
- */
-export type EmbedProvider =
-  | "youtube"
-  | "x"
-  | "tiktok"
-  | "instagram"
-  | "reddit"
-  | "vimeo"
-  | "native";
-
-export function isEmbedProvider(value: unknown): value is EmbedProvider {
-  return (
-    value === "youtube" ||
-    value === "x" ||
-    value === "tiktok" ||
-    value === "instagram" ||
-    value === "reddit" ||
-    value === "vimeo" ||
-    value === "native"
-  );
-}
-
 export type PlatformSlug =
   | "x"
   | "reddit"

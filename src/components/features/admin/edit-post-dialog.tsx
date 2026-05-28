@@ -28,6 +28,7 @@ import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { cn } from "@/lib/utils";
 import { slugify, SLUG_MAX_LEN, TITLE_MAX_LEN } from "@/lib/slug";
+import { safeImageSrc, safeVideoSrc } from "@/lib/safe-url";
 import { TagAxisPicker } from "@/components/features/add-prompt/tag-axis-picker";
 
 const EMPTY_TAGS_BY_AXIS: TagsByAxis = {
@@ -97,6 +98,7 @@ function makeSlot(url: string | null): ImageSlot {
 export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
   const router = useRouter();
   const isRemix = post.prompt_type === "remix";
+  const isVideo = post.media_type === "video";
 
   const [userId, setUserId] = useState<string | null>(null);
   const [models, setModels] = useState<ModelOpt[]>([]);
@@ -122,6 +124,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
     post.external_creator_platform ?? "",
   );
 
+  const [videoUrl, setVideoUrl] = useState(post.media_url);
   const [main, setMain] = useState<ImageSlot>(makeSlot(post.media_url));
   const [source, setSource] = useState<ImageSlot>(
     makeSlot(post.source_image_url ?? null),
@@ -147,6 +150,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
     setExtHandle(post.external_creator_handle ?? "");
     setExtUrl(post.external_creator_url ?? "");
     setExtPlatform(post.external_creator_platform ?? "");
+    setVideoUrl(post.media_url);
     setMain(makeSlot(post.media_url));
     setSource(makeSlot(post.source_image_url ?? null));
     setExtras((post.extra_image_urls ?? []).map(makeSlot));
@@ -302,7 +306,12 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
       setError("You need to be signed in to upload images.");
       return;
     }
-    if (!main.preview) {
+    if (isVideo) {
+      if (!safeVideoSrc(videoUrl)) {
+        setError("Enter a valid direct video URL (.mp4/.webm).");
+        return;
+      }
+    } else if (!main.preview) {
       setError("Main image can't be empty.");
       return;
     }
@@ -330,23 +339,16 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
         external_creator_platform: extPlatform || null,
       };
 
-      if (isHttpUrl(main.externalUrl)) {
-        patch.media_url = main.externalUrl.trim();
-        patch.thumbnail_url = main.externalUrl.trim();
-      } else if (main.file) {
-        const url = await uploadReplacementImage(
-          userId,
-          post.id,
-          "out",
-          main.file,
-        );
-        patch.media_url = url;
-        patch.thumbnail_url = url;
-      }
-
-      if (isRemix) {
-        if (isHttpUrl(source.externalUrl)) {
-          patch.source_image_url = source.externalUrl.trim();
+      if (isVideo) {
+        const safeVideo = safeVideoSrc(videoUrl);
+        if (!safeVideo) throw new Error("Invalid video URL.");
+        patch.media_url = safeVideo;
+        // Input image (image-to-video) → source_image_url; clearing it
+        // leaves the post as text-to-video. safeImageSrc also rejects
+        // private/loopback hosts (SSRF), unlike the bare isHttpUrl check.
+        const safeSource = safeImageSrc(source.externalUrl);
+        if (safeSource) {
+          patch.source_image_url = safeSource;
         } else if (source.file) {
           const url = await uploadReplacementImage(
             userId,
@@ -358,27 +360,57 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
         } else if (source.url === null) {
           patch.source_image_url = null;
         }
-      }
-
-      // Rebuild the extras array preserving order.
-      const newExtras: string[] = [];
-      for (let i = 0; i < extras.length; i++) {
-        const e = extras[i]!;
-        if (isHttpUrl(e.externalUrl)) {
-          newExtras.push(e.externalUrl.trim());
-        } else if (e.file) {
+      } else {
+        if (isHttpUrl(main.externalUrl)) {
+          patch.media_url = main.externalUrl.trim();
+          patch.thumbnail_url = main.externalUrl.trim();
+        } else if (main.file) {
           const url = await uploadReplacementImage(
             userId,
             post.id,
-            `x${i + 1}`,
-            e.file,
+            "out",
+            main.file,
           );
-          newExtras.push(url);
-        } else if (e.url) {
-          newExtras.push(e.url);
+          patch.media_url = url;
+          patch.thumbnail_url = url;
         }
+
+        if (isRemix) {
+          if (isHttpUrl(source.externalUrl)) {
+            patch.source_image_url = source.externalUrl.trim();
+          } else if (source.file) {
+            const url = await uploadReplacementImage(
+              userId,
+              post.id,
+              "in",
+              source.file,
+            );
+            patch.source_image_url = url;
+          } else if (source.url === null) {
+            patch.source_image_url = null;
+          }
+        }
+
+        // Rebuild the extras array preserving order.
+        const newExtras: string[] = [];
+        for (let i = 0; i < extras.length; i++) {
+          const e = extras[i]!;
+          if (isHttpUrl(e.externalUrl)) {
+            newExtras.push(e.externalUrl.trim());
+          } else if (e.file) {
+            const url = await uploadReplacementImage(
+              userId,
+              post.id,
+              `x${i + 1}`,
+              e.file,
+            );
+            newExtras.push(url);
+          } else if (e.url) {
+            newExtras.push(e.url);
+          }
+        }
+        patch.extra_image_urls = newExtras;
       }
-      patch.extra_image_urls = newExtras;
 
       await updatePost(post.id, patch);
       await applyPostTagsDiff(post.id, initialTagSlugs, tagSlugs);
@@ -420,8 +452,53 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
             {/* Images section */}
             <section className="flex flex-col gap-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
-                Images
+                {isVideo ? "Video" : "Images"}
               </div>
+              {isVideo ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+                      Video file URL
+                    </span>
+                    <input
+                      type="url"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      placeholder="https://…/clip.mp4"
+                      className="w-full rounded-[10px] border bg-surface-2 px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                    />
+                    {videoUrl.trim() && !safeVideoSrc(videoUrl) ? (
+                      <span className="text-[11px] text-red-500">
+                        Invalid or unsafe video URL.
+                      </span>
+                    ) : null}
+                  </div>
+                  <ImageEditorCard
+                    label="Input image (image-to-video)"
+                    badge={<Wand2 className="h-3 w-3" strokeWidth={2} />}
+                    preview={source.preview}
+                    externalUrl={source.externalUrl}
+                    hasFile={Boolean(source.file)}
+                    onReplace={replaceSource}
+                    onUrlChange={(v) => setExternalUrl(setSource, source, v)}
+                    onRemove={
+                      source.preview
+                        ? () =>
+                            setSource({
+                              url: null,
+                              file: null,
+                              preview: null,
+                              externalUrl: "",
+                            })
+                        : undefined
+                    }
+                  />
+                  <p className="text-[11px] text-text-subtle">
+                    Leave the input image empty for text-to-video. We
+                    don&rsquo;t host the file — paste a direct .mp4/.webm URL.
+                  </p>
+                </div>
+              ) : (
               <div
                 className={cn(
                   "grid gap-3",
@@ -448,8 +525,9 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
                   />
                 ) : null}
               </div>
+              )}
 
-              {!isRemix ? (
+              {!isRemix && !isVideo ? (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] font-medium text-text-muted">

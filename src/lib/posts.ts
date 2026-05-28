@@ -268,6 +268,8 @@ function makeVirtualModel(postCount: number): Model {
     post_count: postCount,
     created_at: new Date(0).toISOString(),
     icon_url: null,
+    // "Other" groups unknown-slug posts, which today are all images.
+    kind: "image",
   };
 }
 

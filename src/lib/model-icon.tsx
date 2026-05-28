@@ -108,6 +108,33 @@ export const MODEL_BRAND: Record<string, ModelBrand> = {
     fg: "#ffffff",
     letter: "S",
   },
+  "seedance-2-0": {
+    label: "Seedance 2.0",
+    bg: "#1d4ed8",
+    fg: "#ffffff",
+    letter: "S",
+  },
+  // Kling — Kuaishou video models (monogram; no official simple-icon)
+  "kling-o1": {
+    label: "Kling O1",
+    bg: "#0b1f3a",
+    fg: "#ffffff",
+    letter: "K",
+  },
+  "kling-3-0": {
+    label: "Kling 3.0",
+    bg: "#0b1f3a",
+    fg: "#ffffff",
+    letter: "K",
+  },
+  // Google Veo — reuses the real Gemini star mark + Google AI colors
+  "veo-3-1": {
+    label: "Google Veo 3.1",
+    bg: "#1f1f1f",
+    fg: "#8ab4f8",
+    path: GEMINI_PATH,
+    letter: "V",
+  },
 };
 
 export function modelBrand(slug: string): ModelBrand {

@@ -4,9 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ArrowLeftRight,
-  Film,
-  Image as ImageIcon,
-  Layers,
   Search,
   SlidersHorizontal,
   X,
@@ -61,14 +58,19 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
     return () => window.clearTimeout(t);
   }, [searchInput, state.q, setFilter]);
 
+  // Only show models that generate the active media kind (Gallery = image,
+  // Video = video) so the picker mirrors the top switcher and never mixes.
+  const activeKind: MediaType = state.mediaType ?? "image";
   const modelOptions = useMemo<FilterOption[]>(
     () =>
-      models.map((m) => ({
-        value: m.slug,
-        label: m.name,
-        meta: m.post_count,
-      })),
-    [models],
+      models
+        .filter((m) => m.kind === activeKind)
+        .map((m) => ({
+          value: m.slug,
+          label: m.name,
+          meta: m.post_count,
+        })),
+    [models, activeKind],
   );
 
   const platformOptions = useMemo<FilterOption[]>(
@@ -84,8 +86,7 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
   const activeCount =
     [state.model, state.platform].filter(Boolean).length +
     (state.sort !== "newest" ? 1 : 0) +
-    (state.tags.length > 0 ? 1 : 0) +
-    (state.mediaType ? 1 : 0);
+    (state.tags.length > 0 ? 1 : 0);
 
   return (
     <div className="flex items-center gap-2 border-b bg-surface px-3 py-3 sm:px-5 lg:px-7">
@@ -123,10 +124,6 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
       </div>
 
       <div className="hidden flex-1 flex-wrap items-center gap-2 md:flex">
-        <MediaTypeSegmented
-          value={state.mediaType}
-          onChange={(v) => setFilter({ mediaType: v })}
-        />
         <FilterDropdown
           activeValue={state.model}
           allLabel="All Models"
@@ -307,21 +304,20 @@ function MobileFilterModal({
           </header>
 
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-4 py-4">
-            <Section label="Media">
+            <Section label="Gallery / Video">
               <ChoiceChip
-                label="All"
-                active={!activeMediaType}
-                onSelect={() => setFilter({ mediaType: undefined })}
+                label="Gallery"
+                active={(activeMediaType ?? "image") === "image"}
+                onSelect={() =>
+                  setFilter({ mediaType: "image", model: undefined })
+                }
               />
               <ChoiceChip
-                label="Images"
-                active={activeMediaType === "image"}
-                onSelect={() => setFilter({ mediaType: "image" })}
-              />
-              <ChoiceChip
-                label="Videos"
+                label="Video"
                 active={activeMediaType === "video"}
-                onSelect={() => setFilter({ mediaType: "video" })}
+                onSelect={() =>
+                  setFilter({ mediaType: "video", model: undefined })
+                }
               />
             </Section>
 
@@ -514,72 +510,3 @@ function ChoiceChip({
   );
 }
 
-/**
- * Three-state media filter for the desktop filter bar. Sits to the left
- * of the model/platform/sort dropdowns so the first thing a user picks
- * is the kind of prompt they want to browse.
- */
-function MediaTypeSegmented({
-  value,
-  onChange,
-}: {
-  value: MediaType | undefined;
-  onChange: (next: MediaType | undefined) => void;
-}) {
-  const items: Array<{
-    key: "all" | MediaType;
-    label: string;
-    icon: React.ReactNode;
-    title: string;
-  }> = [
-    {
-      key: "all",
-      label: "All",
-      icon: <Layers className="h-3.5 w-3.5" strokeWidth={2} />,
-      title: "Images and videos",
-    },
-    {
-      key: "image",
-      label: "Images",
-      icon: <ImageIcon className="h-3.5 w-3.5" strokeWidth={2} />,
-      title: "Image prompts only",
-    },
-    {
-      key: "video",
-      label: "Videos",
-      icon: <Film className="h-3.5 w-3.5" strokeWidth={2} />,
-      title: "Video prompts only",
-    },
-  ];
-  const active = value ?? "all";
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Media type"
-      className="inline-flex items-center overflow-hidden rounded-[10px] border bg-surface"
-    >
-      {items.map((it) => {
-        const isActive = active === it.key;
-        return (
-          <button
-            key={it.key}
-            type="button"
-            role="radio"
-            aria-checked={isActive}
-            title={it.title}
-            onClick={() => onChange(it.key === "all" ? undefined : it.key)}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 py-2 text-[13px] font-medium transition-colors",
-              isActive
-                ? "bg-text text-bg"
-                : "text-text-muted hover:bg-hover hover:text-text",
-            )}
-          >
-            {it.icon}
-            <span>{it.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}

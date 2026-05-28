@@ -45,6 +45,16 @@ export function safeImageSrc(raw: string | null | undefined): string | null {
   return href;
 }
 
+/**
+ * Validates a URL intended for `<video src>`. Same guarantees as
+ * safeImageSrc (http/https + private/loopback/metadata SSRF rejection) —
+ * video posts are direct-file (hotlinked .mp4/.webm), so the stored URL
+ * must be sanitised at render exactly like image URLs.
+ */
+export function safeVideoSrc(raw: string | null | undefined): string | null {
+  return safeImageSrc(raw);
+}
+
 const PRIVATE_IPV4_RE = /^(?:10|127|0|169\.254|192\.168|172\.(?:1[6-9]|2\d|3[01]))(?:\.|$)/;
 
 function isUnsafeHost(host: string): boolean {

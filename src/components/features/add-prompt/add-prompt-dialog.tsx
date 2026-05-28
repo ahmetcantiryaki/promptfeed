@@ -34,7 +34,7 @@ import { parseSourceUrl, sourceDisplayLabel } from "@/lib/source-url";
 import { PrettySelect, type SelectOption } from "@/components/ui/select";
 import { tryParseJson, prettifyJson } from "@/lib/prompt-format";
 import { processImage } from "@/lib/image-processing";
-import { safeImageSrc } from "@/lib/safe-url";
+import { safeImageSrc, safeVideoSrc } from "@/lib/safe-url";
 import { cn, formatCount } from "@/lib/utils";
 import {
   deriveTitleFromPrompt,
@@ -42,7 +42,7 @@ import {
   TITLE_MAX_LEN,
   SLUG_MAX_LEN,
 } from "@/lib/slug";
-import { detectEmbedProvider } from "@/lib/video-embed";
+import { looksLikeVideoUrl, firstFrameSrc } from "@/lib/video";
 
 interface Props {
   open: boolean;
@@ -77,26 +77,6 @@ function hostnameFromUrl(raw: string): string | null {
 
 type PromptType = "standard" | "remix";
 type MediaTypeSel = "image" | "video";
-
-function isHttpsUrl(raw: string): boolean {
-  const v = raw.trim();
-  if (!v) return false;
-  try {
-    const u = new URL(v);
-    return u.protocol === "https:" || u.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
-/** YouTube auto-poster: img.youtube.com/vi/{ID}/maxresdefault.jpg. */
-function youtubePosterFromUrl(url: string): string | null {
-  const watch = url.match(/[?&]v=([a-zA-Z0-9_-]{6,})/);
-  const youtu = url.match(/youtu\.be\/([a-zA-Z0-9_-]{6,})/i);
-  const embed = url.match(/youtube\.com\/(?:embed|shorts)\/([a-zA-Z0-9_-]{6,})/i);
-  const id = watch?.[1] ?? youtu?.[1] ?? embed?.[1] ?? null;
-  return id ? `https://img.youtube.com/vi/${id}/maxresdefault.jpg` : null;
-}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -150,17 +130,16 @@ export function AddPromptDialog({
     EMPTY_SLOT,
   ]);
 
-  // Video mode — pure-embed architecture. Video is referenced by source
-  // URL (provider iframe at render time) plus a poster image URL the
-  // card and modal use for the preview.
+  // Video mode — direct-file architecture. The clip is a direct .mp4/.webm
+  // URL stored in media_url; image-to-video reuses the shared `source` slot
+  // as the input image (→ source_image_url, the card poster). aspect_ratio
+  // and duration are auto-derived from the file's own metadata.
   const [videoUrl, setVideoUrl] = useState("");
-  const [posterUrl, setPosterUrl] = useState("");
-  const [posterAutoFilled, setPosterAutoFilled] = useState(false);
-
-  const detectedProvider = useMemo(
-    () => (videoUrl.trim() ? detectEmbedProvider(videoUrl.trim()) : null),
-    [videoUrl],
-  );
+  const [videoIsI2V, setVideoIsI2V] = useState(false);
+  const [videoMeta, setVideoMeta] = useState<{
+    aspectRatio: number;
+    duration: number;
+  } | null>(null);
 
   // SEO/URL customization is collapsed by default to keep the form tight
   // — title and slug are auto-derived from the prompt body and only need
@@ -197,8 +176,54 @@ export function AddPromptDialog({
     };
   }, [result.url, source.url]);
 
+  // Auto-derive aspect ratio + duration from the pasted video file so the
+  // masonry can reserve space (no CLS) and the card can show a duration
+  // badge — without asking the user to measure anything. Metadata-only
+  // load; we never pull the whole file here.
+  useEffect(() => {
+    const safe = mediaType === "video" ? safeVideoSrc(videoUrl) : null;
+    if (!safe) {
+      setVideoMeta(null);
+      return;
+    }
+    let cancelled = false;
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.muted = true;
+    const onMeta = () => {
+      if (cancelled) return;
+      const w = probe.videoWidth;
+      const h = probe.videoHeight;
+      const d = probe.duration;
+      setVideoMeta({
+        aspectRatio: w > 0 && h > 0 ? w / h : 0,
+        duration: Number.isFinite(d) ? d : 0,
+      });
+    };
+    const onError = () => {
+      if (!cancelled) setVideoMeta(null);
+    };
+    probe.addEventListener("loadedmetadata", onMeta);
+    probe.addEventListener("error", onError);
+    probe.src = safe;
+    return () => {
+      cancelled = true;
+      probe.removeEventListener("loadedmetadata", onMeta);
+      probe.removeEventListener("error", onError);
+      probe.removeAttribute("src");
+      probe.load();
+    };
+  }, [videoUrl, mediaType]);
+
   const parsedJson = useMemo(() => tryParseJson(prompt), [prompt]);
   const isJson = parsedJson !== null;
+
+  // Keep the model picker in sync with the chosen media kind — a video post
+  // must use a video model and an image post an image model.
+  useEffect(() => {
+    const valid = models.filter((m) => m.kind === mediaType).map((m) => m.slug);
+    if (!valid.includes(modelSlug)) setModelSlug(valid[0] ?? "");
+  }, [mediaType, models, modelSlug]);
 
   function pickFile(slot: "result" | "source", selected: File | null) {
     if (!selected) return;
@@ -308,26 +333,11 @@ export function AddPromptDialog({
     setPromptType("standard");
     setMediaType("image");
     setVideoUrl("");
-    setPosterUrl("");
-    setPosterAutoFilled(false);
+    setVideoIsI2V(false);
+    setVideoMeta(null);
     setShowSeo(false);
     setTagSlugs(new Set());
     setError(null);
-  }
-
-  function onChangeVideoUrl(next: string) {
-    setVideoUrl(next);
-    // Auto-fill poster from YouTube if the user hasn't touched it. Once
-    // they hand-edit posterUrl the autofill stops chasing them.
-    const yt = youtubePosterFromUrl(next);
-    if (yt && (posterUrl === "" || posterAutoFilled)) {
-      setPosterUrl(yt);
-      setPosterAutoFilled(true);
-    }
-  }
-  function onChangePosterUrl(next: string) {
-    setPosterUrl(next);
-    setPosterAutoFilled(false);
   }
 
   // Auto-fill title from prompt's first sentence until the user types in
@@ -409,12 +419,12 @@ export function AddPromptDialog({
         return;
       }
     } else {
-      if (!isHttpsUrl(videoUrl)) {
-        setError("Paste the video URL (https://…).");
+      if (!safeVideoSrc(videoUrl)) {
+        setError("Paste a valid direct video URL (https:// .mp4 or .webm).");
         return;
       }
-      if (!isHttpsUrl(posterUrl)) {
-        setError("Paste a poster image URL for the card preview.");
+      if (videoIsI2V && !slotIsFilled(source)) {
+        setError("Image-to-video needs the input image.");
         return;
       }
     }
@@ -447,7 +457,7 @@ export function AddPromptDialog({
       // uploads (or accepts external URLs) like before; video mode uses
       // the source URL directly + a separate poster URL for the card.
       let mainMediaUrl: string;
-      let thumbnailUrl: string;
+      let thumbnailUrl: string | null = null;
       let sourceImageUrl: string | null = null;
       let extraUrls: string[] = [];
 
@@ -472,8 +482,17 @@ export function AddPromptDialog({
           }
         }
       } else {
-        mainMediaUrl = videoUrl.trim();
-        thumbnailUrl = posterUrl.trim();
+        const safeVideo = safeVideoSrc(videoUrl);
+        if (!safeVideo) throw new Error("Video URL is invalid.");
+        mainMediaUrl = safeVideo;
+        // text-to-video shows the first frame (no poster asset); image-to-
+        // video uses the input image as source_image_url (and card poster).
+        thumbnailUrl = null;
+        if (videoIsI2V) {
+          const inputImage = await resolveSlot(source, postId, "in");
+          if (!inputImage) throw new Error("Input image is missing.");
+          sourceImageUrl = inputImage.mainUrl;
+        }
       }
 
       if (!parsedCreator) throw new Error("Source URL missing.");
@@ -499,8 +518,14 @@ export function AddPromptDialog({
       const videoExtras =
         mediaType === "video"
           ? {
-              embed_provider:
-                detectedProvider ?? detectEmbedProvider(mainMediaUrl),
+              aspect_ratio:
+                videoMeta && videoMeta.aspectRatio > 0
+                  ? videoMeta.aspectRatio
+                  : null,
+              duration_seconds:
+                videoMeta && videoMeta.duration > 0
+                  ? Math.round(videoMeta.duration)
+                  : null,
             }
           : {};
 
@@ -567,12 +592,14 @@ export function AddPromptDialog({
     if (pretty !== null) setPrompt(pretty);
   }
 
-  const modelOptions: SelectOption<string>[] = models.map((m) => ({
-    value: m.slug,
-    label: m.name,
-    icon: <ModelBadge slug={m.slug} size={20} />,
-    meta: `${formatCount(m.post_count)} posts`,
-  }));
+  const modelOptions: SelectOption<string>[] = models
+    .filter((m) => m.kind === mediaType)
+    .map((m) => ({
+      value: m.slug,
+      label: m.name,
+      icon: <ModelBadge slug={m.slug} size={20} />,
+      meta: `${formatCount(m.post_count)} posts`,
+    }));
   const platformOptions: SelectOption<string>[] = platforms.map((p) => ({
     value: p.slug,
     label: p.name,
@@ -591,8 +618,8 @@ export function AddPromptDialog({
       if (!slotIsFilled(result)) return false;
       if (promptType === "remix" && !slotIsFilled(source)) return false;
     } else {
-      if (!isHttpsUrl(videoUrl)) return false;
-      if (!isHttpsUrl(posterUrl)) return false;
+      if (!safeVideoSrc(videoUrl)) return false;
+      if (videoIsI2V && !slotIsFilled(source)) return false;
     }
     if (prompt.trim().length < 6) return false;
     if (prompt.length > PROMPT_MAX) return false;
@@ -606,7 +633,7 @@ export function AddPromptDialog({
     promptType,
     source,
     videoUrl,
-    posterUrl,
+    videoIsI2V,
     prompt,
     modelSlug,
     platformSlug,
@@ -691,10 +718,17 @@ export function AddPromptDialog({
               {mediaType === "video" ? (
                 <VideoSection
                   videoUrl={videoUrl}
-                  posterUrl={posterUrl}
-                  detectedProvider={detectedProvider}
-                  onChangeVideoUrl={onChangeVideoUrl}
-                  onChangePosterUrl={onChangePosterUrl}
+                  onChangeVideoUrl={setVideoUrl}
+                  isI2V={videoIsI2V}
+                  onToggleI2V={setVideoIsI2V}
+                  videoMeta={videoMeta}
+                  source={source}
+                  sourceInputRef={sourceInputRef}
+                  onPickSource={(f) => pickFile("source", f)}
+                  onClearSource={() => clearSlot("source")}
+                  onSourceUrlChange={(v) => setSlotExternalUrl("source", v)}
+                  dragging={dragging === "source"}
+                  onDragState={(d) => setDragging(d ? "source" : null)}
                 />
               ) : (
                 <>
@@ -1025,55 +1059,63 @@ export function AddPromptDialog({
 
 interface VideoSectionProps {
   videoUrl: string;
-  posterUrl: string;
-  detectedProvider: string | null;
   onChangeVideoUrl: (v: string) => void;
-  onChangePosterUrl: (v: string) => void;
+  isI2V: boolean;
+  onToggleI2V: (v: boolean) => void;
+  videoMeta: { aspectRatio: number; duration: number } | null;
+  source: FileSlot;
+  sourceInputRef: React.RefObject<HTMLInputElement | null>;
+  onPickSource: (f: File | null) => void;
+  onClearSource: () => void;
+  onSourceUrlChange: (v: string) => void;
+  dragging: boolean;
+  onDragState: (d: boolean) => void;
 }
 
 /**
- * Video-mode left column. Two URL fields (source URL + poster URL) plus
- * a live provider hint and a small poster preview. No file upload — the
- * pure-embed architecture renders the source URL inside an iframe, so
- * we never host the video bytes ourselves.
+ * Video-mode left column (direct-file architecture). A single required
+ * field — the direct .mp4/.webm URL — plus an "image-to-video" toggle that
+ * reveals the input-image picker (reusing the shared `source` slot). We
+ * never host the bytes; aspect ratio + duration are read from the file's
+ * metadata, so text-to-video posts need nothing else (the card shows the
+ * first frame straight from the clip).
  */
 function VideoSection({
   videoUrl,
-  posterUrl,
-  detectedProvider,
   onChangeVideoUrl,
-  onChangePosterUrl,
+  isI2V,
+  onToggleI2V,
+  videoMeta,
+  source,
+  sourceInputRef,
+  onPickSource,
+  onClearSource,
+  onSourceUrlChange,
+  dragging,
+  onDragState,
 }: VideoSectionProps) {
-  const providerLabel = detectedProvider
-    ? detectedProvider === "x"
-      ? "X (Twitter)"
-      : detectedProvider === "youtube"
-        ? "YouTube"
-        : detectedProvider === "tiktok"
-          ? "TikTok"
-          : detectedProvider === "instagram"
-            ? "Instagram"
-            : detectedProvider === "reddit"
-              ? "Reddit"
-              : detectedProvider === "vimeo"
-                ? "Vimeo"
-                : detectedProvider
-    : null;
+  const trimmed = videoUrl.trim();
+  const safe = safeVideoSrc(trimmed);
+  const looksRight = trimmed ? looksLikeVideoUrl(trimmed) : true;
+  const frameSrc = firstFrameSrc(safe);
+  const inputPreview = slotPreviewUrl(source);
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2 text-[12px] font-medium text-text-muted">
           <span className="inline-flex items-center gap-1.5">
             <Film className="h-3.5 w-3.5" strokeWidth={2} />
-            Video source URL<span className="text-red-500">*</span>
+            Video file URL<span className="text-red-500">*</span>
           </span>
-          {providerLabel ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
-              {providerLabel}
-            </span>
-          ) : videoUrl.trim() ? (
-            <span className="text-[10px] text-amber-500">
-              Unknown provider — will fall back to &ldquo;Open at source&rdquo;
+          {videoMeta && (videoMeta.aspectRatio > 0 || videoMeta.duration > 0) ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-600">
+              {videoMeta.aspectRatio > 0
+                ? `${videoMeta.aspectRatio.toFixed(2)}:1`
+                : null}
+              {videoMeta.duration > 0
+                ? `${videoMeta.aspectRatio > 0 ? " · " : ""}${Math.round(videoMeta.duration)}s`
+                : null}
             </span>
           ) : null}
         </div>
@@ -1081,39 +1123,80 @@ function VideoSection({
           type="url"
           value={videoUrl}
           onChange={(e) => onChangeVideoUrl(e.target.value)}
-          placeholder="https://youtube.com/watch?v=… or any provider URL"
+          placeholder="https://…/clip.mp4 (direct .mp4 or .webm)"
           className="rounded-[10px] border bg-surface px-3 py-2.5 text-[13px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
         />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[12px] font-medium text-text-muted">
-          Poster image URL<span className="text-red-500">*</span>
-        </span>
-        <input
-          type="url"
-          value={posterUrl}
-          onChange={(e) => onChangePosterUrl(e.target.value)}
-          placeholder="https://… (used for the card preview)"
-          className="rounded-[10px] border bg-surface px-3 py-2.5 text-[13px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
-        />
-        {posterUrl && safeImageSrc(posterUrl) ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <div className="mt-1 overflow-hidden rounded-[10px] border bg-black">
-            <img
-              src={posterUrl.trim()}
-              alt="Poster preview"
-              className="block aspect-[16/9] w-full object-cover"
-            />
-          </div>
+        {trimmed && !safe ? (
+          <p className="text-[11px] text-red-500">
+            Enter a valid https:// URL (no private or local hosts).
+          </p>
+        ) : trimmed && !looksRight ? (
+          <p className="text-[11px] text-amber-500">
+            Doesn&rsquo;t look like a direct video file — it should end in
+            .mp4 or .webm, not be a page URL.
+          </p>
         ) : null}
       </div>
 
-      <div className="rounded-[10px] border bg-surface-2/40 px-3 py-2 text-[11px] leading-[1.5] text-text-subtle">
-        Videos embed via iframe — we never host the bytes. Paste any
-        public provider URL (YouTube, X, TikTok, Instagram, Reddit,
-        Vimeo) and a poster image for the card preview.
+      {/* Live preview — the input image (image-to-video) or the first frame
+          of the clip (text-to-video), matching what the card will show. */}
+      <div className="overflow-hidden rounded-[10px] border bg-black">
+        {isI2V && inputPreview ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={inputPreview}
+            alt="Input image preview"
+            className="block aspect-video w-full object-contain"
+          />
+        ) : frameSrc ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video
+            src={frameSrc}
+            muted
+            playsInline
+            preload="metadata"
+            className="block aspect-video w-full object-contain"
+          />
+        ) : (
+          <div className="grid aspect-video w-full place-items-center text-[11px] text-text-subtle">
+            Preview appears here
+          </div>
+        )}
       </div>
+
+      {/* image-to-video toggle — mirrors the image remix checkbox. */}
+      <label className="flex items-center gap-2.5 rounded-[10px] border bg-surface px-3 py-2 text-[13px] font-medium text-text">
+        <input
+          type="checkbox"
+          checked={isI2V}
+          onChange={(e) => onToggleI2V(e.target.checked)}
+          className="h-4 w-4 cursor-pointer accent-accent"
+        />
+        <Wand2 className="h-4 w-4" strokeWidth={1.8} />
+        <span>Image-to-video</span>
+        <span className="ml-auto text-[11px] font-normal text-text-subtle">
+          {isI2V ? "Input image → clip" : "Prompt → clip"}
+        </span>
+      </label>
+
+      {isI2V ? (
+        <SlotPicker
+          label="Input image"
+          inputRef={sourceInputRef}
+          slot={source}
+          onPick={onPickSource}
+          onClear={onClearSource}
+          onUrlChange={onSourceUrlChange}
+          dragging={dragging}
+          onDragState={onDragState}
+        />
+      ) : (
+        <div className="rounded-[10px] border bg-surface-2/40 px-3 py-2 text-[11px] leading-[1.5] text-text-subtle">
+          Paste a direct video link (.mp4/.webm) — we don&rsquo;t host the
+          file. The card shows its first frame; the detail view plays it.
+          Flip the toggle if an input image produced the clip.
+        </div>
+      )}
     </div>
   );
 }
