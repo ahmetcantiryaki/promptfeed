@@ -8,6 +8,7 @@ import type {
   Platform,
   Profile,
   SocialAccount,
+  TagsByAxis,
 } from "@/types/domain";
 import { AddPromptDialog } from "@/components/features/add-prompt/add-prompt-dialog";
 
@@ -17,6 +18,7 @@ interface Props {
   socials: SocialAccount[];
   models: Model[];
   platforms: Platform[];
+  tagsByAxis: TagsByAxis;
 }
 
 export function AddPromptButton({
@@ -25,6 +27,7 @@ export function AddPromptButton({
   socials,
   models,
   platforms,
+  tagsByAxis,
 }: Props) {
   const [open, setOpen] = useState(false);
   return (
@@ -46,6 +49,7 @@ export function AddPromptButton({
         socials={socials}
         models={models}
         platforms={platforms}
+        tagsByAxis={tagsByAxis}
       />
     </>
   );

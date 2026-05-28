@@ -1,9 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { JetBrains_Mono } from "next/font/google";
+import { Fraunces, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import { Toaster } from "sonner";
 import { SITE_URL, SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/site";
+import { publicEnv } from "@/lib/env";
 import "./globals.css";
+
+const SUPABASE_ORIGIN = (() => {
+  try {
+    return new URL(publicEnv.NEXT_PUBLIC_SUPABASE_URL).origin;
+  } catch {
+    return null;
+  }
+})();
 
 const GA_MEASUREMENT_ID = "G-HFTLQW1JZ7";
 
@@ -11,6 +20,18 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin", "latin-ext"],
   variable: "--font-jetbrains-mono",
   display: "swap",
+});
+
+// Fraunces only ships on the /changelog editorial surface. preload:false keeps
+// the discover feed unaffected; CSS variable is still globally available so
+// the scoped layout can opt-in.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  display: "swap",
+  weight: ["400", "500", "700", "900"],
+  style: ["normal", "italic"],
+  preload: false,
 });
 
 const DEFAULT_TITLE =
@@ -81,12 +102,57 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={jetbrainsMono.variable}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${jetbrainsMono.variable} ${fraunces.variable}`}
+    >
       <head>
+        {SUPABASE_ORIGIN ? (
+          <>
+            <link rel="preconnect" href={SUPABASE_ORIGIN} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={SUPABASE_ORIGIN} />
+          </>
+        ) : null}
         <script
           // Prevent flash of incorrect theme before React mounts.
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('promptfeed.theme');if(t!=='light'&&t!=='dark'){t='dark';}document.documentElement.setAttribute('data-theme',t);}catch(_e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+          }}
+        />
+        <script
+          type="application/ld+json"
+          // Site-wide WebSite + Organization markup. Sitelinks search box is
+          // wired so Google can offer in-SERP search of the prompt archive.
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": `${SITE_URL}/#org`,
+                  name: SITE_NAME,
+                  url: SITE_URL,
+                  logo: `${SITE_URL}/logos/og-default-1200x630.png`,
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": `${SITE_URL}/#website`,
+                  url: SITE_URL,
+                  name: SITE_NAME,
+                  description: DEFAULT_DESCRIPTION,
+                  publisher: { "@id": `${SITE_URL}/#org` },
+                  potentialAction: {
+                    "@type": "SearchAction",
+                    target: {
+                      "@type": "EntryPoint",
+                      urlTemplate: `${SITE_URL}/?q={search_term_string}`,
+                    },
+                    "query-input": "required name=search_term_string",
+                  },
+                },
+              ],
+            }),
           }}
         />
       </head>

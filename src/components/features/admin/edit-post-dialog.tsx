@@ -13,9 +13,12 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Post } from "@/types/domain";
+import type { Post, Tag, TagAxis, TagsByAxis } from "@/types/domain";
+import { MIN_TAGS_PER_POST, TAG_AXES } from "@/types/domain";
 import { createClient } from "@/lib/supabase/browser";
 import {
+  applyPostTagsDiff,
+  getPostTagSlugs,
   updatePost,
   uploadReplacementImage,
   type UpdatePostInput,
@@ -24,6 +27,27 @@ import { PrettySelect, type SelectOption } from "@/components/ui/select";
 import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { cn } from "@/lib/utils";
+import { slugify, SLUG_MAX_LEN, TITLE_MAX_LEN } from "@/lib/slug";
+import { TagAxisPicker } from "@/components/features/add-prompt/tag-axis-picker";
+
+const EMPTY_TAGS_BY_AXIS: TagsByAxis = {
+  subject: [],
+  style: [],
+  use_case: [],
+};
+
+function isTagAxis(value: string): value is TagAxis {
+  return value === "subject" || value === "style" || value === "use_case";
+}
+
+function groupTagsByAxis(rows: readonly Tag[]): TagsByAxis {
+  const grouped: TagsByAxis = { subject: [], style: [], use_case: [] };
+  for (const tag of rows) {
+    if (!isTagAxis(tag.axis)) continue;
+    grouped[tag.axis].push(tag);
+  }
+  return grouped;
+}
 
 interface ModelOpt {
   slug: string;
@@ -77,8 +101,17 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
   const [userId, setUserId] = useState<string | null>(null);
   const [models, setModels] = useState<ModelOpt[]>([]);
   const [platforms, setPlatforms] = useState<PlatformOpt[]>([]);
+  const [tagsByAxis, setTagsByAxis] = useState<TagsByAxis>(EMPTY_TAGS_BY_AXIS);
+  // initialTagSlugs lets us diff at save time without re-querying the server.
+  const [initialTagSlugs, setInitialTagSlugs] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [tagSlugs, setTagSlugs] = useState<Set<string>>(() => new Set());
+  const [tagsLoading, setTagsLoading] = useState(false);
 
   const [prompt, setPrompt] = useState(post.prompt);
+  const [title, setTitle] = useState(post.title);
+  const [slug, setSlug] = useState(post.slug);
   const [modelSlug, setModelSlug] = useState(post.model_slug);
   const [platformSlug, setPlatformSlug] = useState(post.platform_slug);
   const [extHandle, setExtHandle] = useState(
@@ -107,6 +140,8 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
   useEffect(() => {
     if (!open) return;
     setPrompt(post.prompt);
+    setTitle(post.title);
+    setSlug(post.slug);
     setModelSlug(post.model_slug);
     setPlatformSlug(post.platform_slug);
     setExtHandle(post.external_creator_handle ?? "");
@@ -115,6 +150,9 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
     setMain(makeSlot(post.media_url));
     setSource(makeSlot(post.source_image_url ?? null));
     setExtras((post.extra_image_urls ?? []).map(makeSlot));
+    // Reset tag selection too — we'll repopulate from the DB in the fetch effect.
+    setInitialTagSlugs(new Set());
+    setTagSlugs(new Set());
     setError(null);
   }, [open, post]);
 
@@ -125,30 +163,69 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
     objectUrlsRef.current = [];
   }, [open]);
 
-  // Lazy-load model/platform options + current user id the first time we open.
+  // Lazy-load model/platform options + tag vocabulary + the post's current
+  // tags + current user id the first time we open. The tag vocabulary and
+  // model/platform lists are cached after the first open; post_tags refreshes
+  // every open since each post can have a different selection.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    setTagsLoading(true);
     (async () => {
       const supabase = createClient();
-      const [m, p, auth] = await Promise.all([
+      const tagsVocabPromise =
+        tagsByAxis.subject.length +
+          tagsByAxis.style.length +
+          tagsByAxis.use_case.length >
+        0
+          ? Promise.resolve(null)
+          : supabase
+              .from("tags")
+              .select("*")
+              .order("axis", { ascending: true })
+              .order("display_order", { ascending: true });
+      const [m, p, auth, vocab, currentTagSlugs] = await Promise.all([
         models.length > 0
           ? Promise.resolve({ data: null })
           : supabase.from("models").select("slug, name").order("name"),
         platforms.length > 0
           ? Promise.resolve({ data: null })
           : supabase.from("platforms").select("slug, name").order("name"),
-        userId ? Promise.resolve({ data: { user: { id: userId } } }) : supabase.auth.getUser(),
+        userId
+          ? Promise.resolve({ data: { user: { id: userId } } })
+          : supabase.auth.getUser(),
+        tagsVocabPromise,
+        getPostTagSlugs(post.id),
       ]);
       if (cancelled) return;
       if (m.data) setModels(m.data as ModelOpt[]);
       if (p.data) setPlatforms(p.data as PlatformOpt[]);
       if (auth.data?.user?.id) setUserId(auth.data.user.id);
-    })();
+      if (vocab && vocab.data) {
+        setTagsByAxis(groupTagsByAxis(vocab.data as Tag[]));
+      }
+      const initial = new Set(currentTagSlugs);
+      setInitialTagSlugs(initial);
+      setTagSlugs(new Set(initial));
+      setTagsLoading(false);
+    })().catch((e) => {
+      if (cancelled) return;
+      setTagsLoading(false);
+      setError(e instanceof Error ? e.message : "Failed to load tags");
+    });
     return () => {
       cancelled = true;
     };
-  }, [open, models.length, platforms.length, userId]);
+  }, [
+    open,
+    post.id,
+    models.length,
+    platforms.length,
+    userId,
+    tagsByAxis.subject.length,
+    tagsByAxis.style.length,
+    tagsByAxis.use_case.length,
+  ]);
 
   const modelOptions: SelectOption<string>[] = models.map((m) => ({
     value: m.slug,
@@ -229,11 +306,23 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
       setError("Main image can't be empty.");
       return;
     }
+    if (tagSlugs.size < MIN_TAGS_PER_POST) {
+      setError("Pick at least one tag.");
+      return;
+    }
 
     setSaving(true);
     try {
       const patch: UpdatePostInput = {
         prompt: prompt.trim(),
+        // Send title/slug only when changed; the trigger keeps existing
+        // values if both are absent in the patch (UPDATE OF clause).
+        ...(title.trim() && title.trim() !== post.title
+          ? { title: title.trim().slice(0, TITLE_MAX_LEN) }
+          : {}),
+        ...(slug.trim() && slug.trim() !== post.slug
+          ? { slug: slugify(slug, SLUG_MAX_LEN) }
+          : {}),
         model_slug: modelSlug,
         platform_slug: platformSlug,
         external_creator_handle: extHandle.trim() || null,
@@ -292,6 +381,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
       patch.extra_image_urls = newExtras;
 
       await updatePost(post.id, patch);
+      await applyPostTagsDiff(post.id, initialTagSlugs, tagSlugs);
       toast.success("Prompt updated");
       onSaved?.();
       onOpenChange(false);
@@ -420,6 +510,33 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
             </section>
 
             {/* Text section */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label={`Title (SEO) — ${title.length}/${TITLE_MAX_LEN}`}>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) =>
+                    setTitle(e.target.value.slice(0, TITLE_MAX_LEN))
+                  }
+                  placeholder="Short SEO title"
+                  maxLength={TITLE_MAX_LEN}
+                  className="w-full rounded-[10px] border bg-surface-2 px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                />
+              </Field>
+              <Field label="URL slug">
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) =>
+                    setSlug(e.target.value.toLowerCase().slice(0, SLUG_MAX_LEN))
+                  }
+                  placeholder="auto-from-title"
+                  maxLength={SLUG_MAX_LEN}
+                  className="w-full rounded-[10px] border bg-surface-2 px-3 py-2 font-mono text-[12px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                />
+              </Field>
+            </div>
+
             <Field label="Prompt">
               <textarea
                 value={prompt}
@@ -447,6 +564,19 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
                 />
               </Field>
             </div>
+
+            {tagsLoading ? (
+              <div className="rounded-[10px] border bg-surface-2/40 px-3 py-3 text-[12px] text-text-subtle">
+                Loading tags…
+              </div>
+            ) : (
+              <TagAxisPicker
+                tagsByAxis={tagsByAxis}
+                selected={tagSlugs}
+                onChange={setTagSlugs}
+                axes={TAG_AXES}
+              />
+            )}
 
             <Field label="Original creator handle (optional)">
               <input

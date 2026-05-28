@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Post, SaveFolder, SaveFolderSummary } from "@/types/domain";
+import { POSTS_WITH_TAGS_SELECT, flattenPostsWithTags } from "@/lib/posts";
 
 const COVER_LIMIT = 4;
 
@@ -134,11 +135,12 @@ export async function listSavedPostsInFolder(
 
   const { data: posts, error: postsErr } = await supabase
     .from("posts")
-    .select("*")
+    .select(POSTS_WITH_TAGS_SELECT)
     .in("id", ids);
   if (postsErr) throw postsErr;
 
-  const byId = new Map((posts ?? []).map((p) => [p.id, p]));
+  const flat = flattenPostsWithTags(posts ?? []);
+  const byId = new Map(flat.map((p) => [p.id, p]));
   return ids
     .map((id) => byId.get(id))
     .filter((p): p is Post => p !== undefined);

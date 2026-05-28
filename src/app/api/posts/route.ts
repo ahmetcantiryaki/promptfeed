@@ -4,6 +4,7 @@ import {
   listPostsPaged,
   type PostsCursor,
 } from "@/lib/posts";
+import { decodeTagParam } from "@/lib/category-url";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import type { MediaType, PostSort } from "@/types/domain";
 
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const model = searchParams.get("model") ?? undefined;
   const platform = searchParams.get("platform") ?? undefined;
+  const tags = decodeTagParam(searchParams.get("tag")).slice(0, 5);
   const mediaType = pickMediaType(searchParams.get("type"));
   const sort = pickSort(searchParams.get("sort"));
   const rawQ = searchParams.get("q") ?? "";
@@ -67,7 +69,15 @@ export async function GET(request: Request) {
   const cursor = parseCursor(searchParams.get("cursor"));
 
   const { posts, nextCursor } = await listPostsPaged(
-    { model, platform, mediaType, sort, limit, q },
+    {
+      model,
+      platform,
+      tags: tags.length > 0 ? tags : undefined,
+      mediaType,
+      sort,
+      limit,
+      q,
+    },
     cursor,
   );
   const ownerIds = posts

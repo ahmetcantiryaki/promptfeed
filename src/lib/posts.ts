@@ -5,15 +5,116 @@ import type { Model, Platform, Post, PostFilters } from "@/types/domain";
 export const OTHER_SLUG = "other";
 const OTHER_LABEL = "Other";
 
+/** Supabase select fragment for posts + their tag slugs. The nested array
+ *  comes back as `{ tag_slug: string }[]`; flattenPostTags() turns that into
+ *  Post.tag_slugs without leaving the helper relation on the object. */
+export const POSTS_WITH_TAGS_SELECT = "*, post_tags(tag_slug)";
+
+interface RawPostWithTags {
+  post_tags?: { tag_slug: string }[] | null;
+  [key: string]: unknown;
+}
+
+/** Flatten a single supabase row that selected POSTS_WITH_TAGS_SELECT. */
+export function flattenPostTags(row: RawPostWithTags): Post {
+  const { post_tags, ...rest } = row;
+  const tag_slugs = (post_tags ?? []).map((t) => t.tag_slug);
+  return { ...(rest as unknown as Post), tag_slugs };
+}
+
+/** Batch flatten — preserves order. */
+export function flattenPostsWithTags(rows: readonly RawPostWithTags[]): Post[] {
+  return rows.map(flattenPostTags);
+}
+
+/**
+ * Resolve a list of tag slugs to the set of post ids that carry ALL of them
+ * (AND intersection). Returns `null` when the filter is disabled (empty tags)
+ * so the caller can skip the .in() narrowing entirely. Returns `[]` when the
+ * filter is active but matches no rows — caller should short-circuit to no
+ * results.
+ */
+async function postIdsMatchingAllTags(
+  tagSlugs: readonly string[],
+): Promise<string[] | null> {
+  if (tagSlugs.length === 0) return null;
+  const supabase = await createClient();
+  // Single-tag case is a simple lookup — skip the GROUP BY HAVING dance.
+  if (tagSlugs.length === 1) {
+    const { data, error } = await supabase
+      .from("post_tags")
+      .select("post_id")
+      .eq("tag_slug", tagSlugs[0]!);
+    if (error) throw error;
+    return (data ?? []).map((r) => r.post_id);
+  }
+  // Multi-tag: fetch all (post_id, tag_slug) rows matching any selected tag,
+  // then keep only post_ids that appeared `tagSlugs.length` times — i.e.
+  // posts carrying every selected tag. Done client-side so we stay on the
+  // PostgREST API without an RPC.
+  const { data, error } = await supabase
+    .from("post_tags")
+    .select("post_id, tag_slug")
+    .in("tag_slug", [...tagSlugs]);
+  if (error) throw error;
+  const required = tagSlugs.length;
+  const tally = new Map<string, Set<string>>();
+  for (const row of data ?? []) {
+    let set = tally.get(row.post_id);
+    if (!set) {
+      set = new Set();
+      tally.set(row.post_id, set);
+    }
+    set.add(row.tag_slug);
+  }
+  const matched: string[] = [];
+  for (const [postId, set] of tally) {
+    if (set.size === required) matched.push(postId);
+  }
+  return matched;
+}
+
 /** Escape characters that have special meaning in PostgREST `ilike` filters
  *  and inside Supabase's `.or()` comma-list. */
 function escapeIlike(s: string): string {
   return s.replace(/[\\%_,()]/g, "\\$&");
 }
 
+/**
+ * Fetch the entire image feed in one query, ordered newest-first. The client
+ * then runs filter/sort/search in memory over this snapshot, eliminating the
+ * round-trip on every filter change. The cap is defensive — at ~342 posts
+ * today the gzipped payload is ~150 KB, well within budget. If the corpus
+ * grows past the cap, switch back to paged server fetches for discover.
+ */
+export async function listAllPostsForFeed(limit = 2000): Promise<Post[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("posts")
+    .select(POSTS_WITH_TAGS_SELECT)
+    .eq("media_type", "image")
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return flattenPostsWithTags(data ?? []);
+}
+
 export async function listPosts(filters: PostFilters = {}): Promise<Post[]> {
   const supabase = await createClient();
-  let query = supabase.from("posts").select("*");
+
+  // Tag intersection first — if no post matches all selected tags, short
+  // circuit before building the main query.
+  const tagIds = filters.tags && filters.tags.length > 0
+    ? await postIdsMatchingAllTags(filters.tags)
+    : null;
+  if (tagIds !== null && tagIds.length === 0) return [];
+
+  let query = supabase.from("posts").select(POSTS_WITH_TAGS_SELECT);
+
+  if (tagIds !== null) {
+    query = query.in("id", tagIds);
+  }
 
   query = query.eq("media_type", filters.mediaType ?? "image");
 
@@ -56,7 +157,7 @@ export async function listPosts(filters: PostFilters = {}): Promise<Post[]> {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+  return flattenPostsWithTags(data ?? []);
 }
 
 async function getKnownModelSlugs(): Promise<string[]> {
@@ -243,7 +344,22 @@ export async function listPostsPaged(
   cursor: PostsCursor | null = null,
 ): Promise<PagedPostsResult> {
   const supabase = await createClient();
-  let query = supabase.from("posts").select("*");
+
+  // Tag intersection — fetch the candidate id set up front. The cursor
+  // walks the same id set (no re-fetch on page-2), but for huge tag sets
+  // we may want a database-side approach later.
+  const tagIds = filters.tags && filters.tags.length > 0
+    ? await postIdsMatchingAllTags(filters.tags)
+    : null;
+  if (tagIds !== null && tagIds.length === 0) {
+    return { posts: [], nextCursor: null };
+  }
+
+  let query = supabase.from("posts").select(POSTS_WITH_TAGS_SELECT);
+
+  if (tagIds !== null) {
+    query = query.in("id", tagIds);
+  }
 
   query = query.eq("media_type", filters.mediaType ?? "image");
 
@@ -344,7 +460,7 @@ export async function listPostsPaged(
 
   const { data, error } = await query;
   if (error) throw error;
-  const posts = data ?? [];
+  const posts = flattenPostsWithTags(data ?? []);
   const last = posts[posts.length - 1];
   const nextCursor =
     posts.length === limit && last

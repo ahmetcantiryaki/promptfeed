@@ -10,6 +10,12 @@ export async function deletePostById(id: string): Promise<void> {
 }
 
 export interface UpdatePostInput {
+  /** Human-readable title (≤60 chars). Empty/undefined → trigger derives
+   *  one from the prompt's first sentence. */
+  title?: string;
+  /** URL slug. When empty/undefined the trigger derives + de-duplicates one
+   *  from the title. Only sent when the admin explicitly edits it. */
+  slug?: string;
   prompt?: string;
   model_slug?: string;
   platform_slug?: string;
@@ -57,6 +63,47 @@ export async function updatePost(
   const supabase = createClient();
   const { error } = await supabase.from("posts").update(patch).eq("id", id);
   if (error) throw error;
+}
+
+/** Fetch the current set of tag slugs attached to a post. */
+export async function getPostTagSlugs(postId: string): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("post_tags")
+    .select("tag_slug")
+    .eq("post_id", postId);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.tag_slug);
+}
+
+/**
+ * Apply a tag-set change as the minimal diff: insert the new slugs, delete
+ * the removed ones. Counter triggers update tags.post_count automatically.
+ * The post owner (or admin) RLS policy lets either operate.
+ */
+export async function applyPostTagsDiff(
+  postId: string,
+  previous: ReadonlySet<string>,
+  next: ReadonlySet<string>,
+): Promise<void> {
+  const toAdd = [...next].filter((s) => !previous.has(s));
+  const toRemove = [...previous].filter((s) => !next.has(s));
+
+  const supabase = createClient();
+
+  if (toAdd.length > 0) {
+    const rows = toAdd.map((tag_slug) => ({ post_id: postId, tag_slug }));
+    const { error } = await supabase.from("post_tags").insert(rows);
+    if (error) throw error;
+  }
+  if (toRemove.length > 0) {
+    const { error } = await supabase
+      .from("post_tags")
+      .delete()
+      .eq("post_id", postId)
+      .in("tag_slug", toRemove);
+    if (error) throw error;
+  }
 }
 
 /** Delete + toast wrapper. Caller should handle confirmation UI. */

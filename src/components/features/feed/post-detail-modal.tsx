@@ -26,6 +26,7 @@ import { safeHref } from "@/lib/safe-url";
 import { trackPostView } from "@/lib/track-view";
 import { RemixCurtain } from "./remix-curtain";
 import { DetailImageSlider } from "./detail-image-slider";
+import { TagPillsRow } from "./tag-pills";
 
 interface Props {
   post: Post | null;
@@ -111,7 +112,7 @@ export function PostDetailModal({
   async function copyLink() {
     if (!post) return;
     try {
-      const url = `${window.location.origin}/prompt/${post.id}`;
+      const url = `${window.location.origin}/prompt/${post.slug}`;
       await navigator.clipboard.writeText(url);
       toast.success("Link copied");
     } catch {
@@ -204,7 +205,7 @@ export function PostDetailModal({
                 <DetailHeader post={post} />
 
                 <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-5 sm:py-5">
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex flex-col gap-3">
                     <Field label="Model">
                       <div className="flex items-center gap-2">
                         <ModelBadge slug={post.model_slug} size={22} />
@@ -213,6 +214,11 @@ export function PostDetailModal({
                         </span>
                       </div>
                     </Field>
+                    {post.tag_slugs && post.tag_slugs.length > 0 ? (
+                      <Field label="Tags">
+                        <TagPillsRow slugs={post.tag_slugs} />
+                      </Field>
+                    ) : null}
                   </div>
 
                   <div className="flex min-h-0 flex-1 flex-col gap-2">

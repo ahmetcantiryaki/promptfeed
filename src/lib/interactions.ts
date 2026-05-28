@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Post } from "@/types/domain";
+import { POSTS_WITH_TAGS_SELECT, flattenPostsWithTags } from "@/lib/posts";
 
 export async function getLikedPostIds(userId: string): Promise<string[]> {
   const supabase = await createClient();
@@ -39,12 +40,13 @@ export async function listSavedPosts(
 
   const { data: posts, error: postsErr } = await supabase
     .from("posts")
-    .select("*")
+    .select(POSTS_WITH_TAGS_SELECT)
     .in("id", ids);
   if (postsErr) throw postsErr;
 
   // Preserve save order
-  const byId = new Map((posts ?? []).map((p) => [p.id, p]));
+  const flat = flattenPostsWithTags(posts ?? []);
+  const byId = new Map(flat.map((p) => [p.id, p]));
   return ids
     .map((id) => byId.get(id))
     .filter((p): p is Post => p !== undefined);
@@ -100,11 +102,12 @@ export async function listLikedPosts(
   const ids = rows.map((r) => r.post_id);
   const { data: posts, error: postsErr } = await supabase
     .from("posts")
-    .select("*")
+    .select(POSTS_WITH_TAGS_SELECT)
     .in("id", ids);
   if (postsErr) throw postsErr;
 
-  const byId = new Map((posts ?? []).map((p) => [p.id, p]));
+  const flat = flattenPostsWithTags(posts ?? []);
+  const byId = new Map(flat.map((p) => [p.id, p]));
   const ordered = rows
     .map((r) => byId.get(r.post_id))
     .filter((p): p is Post => p !== undefined);

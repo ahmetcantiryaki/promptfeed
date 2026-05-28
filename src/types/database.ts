@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -184,6 +186,65 @@ export type Database = {
           },
         ]
       }
+      post_tags: {
+        Row: {
+          created_at: string
+          post_id: string
+          tag_slug: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          tag_slug: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          tag_slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_tags_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_tags_tag_slug_fkey"
+            columns: ["tag_slug"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
+      post_view_dedupe: {
+        Row: {
+          post_id: string
+          viewed_at: string
+          viewer_id: string
+        }
+        Insert: {
+          post_id: string
+          viewed_at?: string
+          viewer_id: string
+        }
+        Update: {
+          post_id?: string
+          viewed_at?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_view_dedupe_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           comments: number
@@ -204,10 +265,12 @@ export type Database = {
           prompt_type: string
           scraped_at: string
           shares: number
+          slug: string
           source_image_url: string | null
           source_url: string
           source_user: string
           thumbnail_url: string | null
+          title: string
           views: number
         }
         Insert: {
@@ -229,10 +292,12 @@ export type Database = {
           prompt_type?: string
           scraped_at?: string
           shares?: number
+          slug: string
           source_image_url?: string | null
           source_url: string
           source_user: string
           thumbnail_url?: string | null
+          title: string
           views?: number
         }
         Update: {
@@ -254,10 +319,12 @@ export type Database = {
           prompt_type?: string
           scraped_at?: string
           shares?: number
+          slug?: string
           source_image_url?: string | null
           source_url?: string
           source_user?: string
           thumbnail_url?: string | null
+          title?: string
           views?: number
         }
         Relationships: [
@@ -413,6 +480,33 @@ export type Database = {
           },
         ]
       }
+      tags: {
+        Row: {
+          axis: string
+          created_at: string
+          display_order: number
+          name: string
+          post_count: number
+          slug: string
+        }
+        Insert: {
+          axis: string
+          created_at?: string
+          display_order?: number
+          name: string
+          post_count?: number
+          slug: string
+        }
+        Update: {
+          axis?: string
+          created_at?: string
+          display_order?: number
+          name?: string
+          post_count?: number
+          slug?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -427,16 +521,23 @@ export type Database = {
           name: string
           user_id: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "save_folders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      increment_post_views: {
-        Args: { p_post_id: string }
-        Returns: undefined
+      derive_title_from_prompt: {
+        Args: { input: string; max_len?: number }
+        Returns: string
       }
+      increment_post_views: { Args: { p_post_id: string }; Returns: undefined }
+      is_admin: { Args: { uid: string }; Returns: boolean }
       record_post_view: {
         Args: { p_post_id: string; p_viewer_id: string }
         Returns: boolean
       }
-      is_admin: { Args: { uid: string }; Returns: boolean }
       set_default_save_folder: {
         Args: { target_folder_id: string }
         Returns: {
@@ -446,6 +547,16 @@ export type Database = {
           name: string
           user_id: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "save_folders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      slugify_text: {
+        Args: { input: string; max_len?: number }
+        Returns: string
       }
     }
     Enums: {

@@ -15,6 +15,7 @@ import type {
   Model,
   Platform,
   Post,
+  PostSort,
   SaveFolder,
   SaveFolderSummary,
 } from "@/types/domain";
@@ -22,16 +23,13 @@ import type { OwnerMap } from "@/lib/posts";
 import { FilterBar } from "@/components/features/filter-bar/filter-bar";
 import { FeedGrid } from "@/components/features/feed/feed-grid";
 import { SavedFoldersGrid } from "@/components/features/save-folders/saved-folders-grid";
-import { useFeedFilter } from "@/components/providers/feed-filter-provider";
+import {
+  useFeedFilter,
+  type FeedFilterState,
+} from "@/components/providers/feed-filter-provider";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { useRouteProgress } from "@/components/providers/route-progress-provider";
 import { useGridSize } from "@/hooks/use-grid-size";
-
-interface InitialFeed {
-  posts: Post[];
-  owners: OwnerMap;
-  nextCursor?: string | null;
-}
 
 interface InitialFolderDetail {
   folder: SaveFolder;
@@ -48,7 +46,11 @@ interface InitialLiked {
 interface Props {
   models: Model[];
   platforms: Platform[];
-  initialFeed: InitialFeed | null;
+  /** Full image dataset, pre-fetched once on the server so the client can
+   *  filter / sort / search in memory without hitting the API. */
+  allPosts: Post[];
+  /** Owner profiles for every post in `allPosts`, keyed by owner_id. */
+  allOwners: OwnerMap;
   initialFolders: SaveFolderSummary[] | null;
   initialFolderDetail: InitialFolderDetail | null;
   initialLiked: InitialLiked | null;
@@ -60,12 +62,99 @@ interface FeedData {
   nextCursor: string | null;
 }
 
-const PAGE_SIZE = 30;
+/** Number of posts revealed by the masonry on first paint. Subsequent
+ *  scrolls extend the slice in chunks of the same size — purely a client
+ *  windowing strategy since the full dataset already lives in memory. */
+const WINDOW_STEP = 60;
+
+function escapeLikeForRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Apply the active feed filter to the pre-fetched dataset. All comparisons
+ * are case-insensitive where natural language is involved; tag filtering
+ * is AND-intersection across `state.tags`.
+ */
+function filterAndSortPosts(
+  posts: readonly Post[],
+  state: FeedFilterState,
+): Post[] {
+  const term = state.q?.trim().toLowerCase() ?? "";
+  const termRe = term ? new RegExp(escapeLikeForRegex(term), "i") : null;
+  const requiredTags = state.tags.length > 0 ? state.tags : null;
+  const model = state.model;
+  const platform = state.platform;
+
+  const filtered = posts.filter((p) => {
+    if (model && p.model_slug !== model) return false;
+    if (platform && p.platform_slug !== platform) return false;
+    if (requiredTags) {
+      const slugs = p.tag_slugs ?? [];
+      for (const required of requiredTags) {
+        if (!slugs.includes(required)) return false;
+      }
+    }
+    if (termRe) {
+      const haystack = [
+        p.prompt,
+        p.source_user,
+        p.source_url ?? "",
+        p.external_creator_handle ?? "",
+        p.external_creator_url ?? "",
+        p.external_creator_platform ?? "",
+        p.model_slug,
+        p.platform_slug,
+      ].join(" ");
+      if (!termRe.test(haystack)) return false;
+    }
+    return true;
+  });
+
+  return sortPosts(filtered, state.sort);
+}
+
+function sortPosts(posts: readonly Post[], sort: PostSort): Post[] {
+  const arr = [...posts];
+  switch (sort) {
+    case "oldest":
+      arr.sort((a, b) => {
+        if (a.created_at === b.created_at) return a.id < b.id ? -1 : 1;
+        return a.created_at < b.created_at ? -1 : 1;
+      });
+      break;
+    case "top":
+      arr.sort((a, b) => {
+        if (a.likes !== b.likes) return b.likes - a.likes;
+        if (a.created_at !== b.created_at)
+          return a.created_at < b.created_at ? 1 : -1;
+        return a.id < b.id ? 1 : -1;
+      });
+      break;
+    case "viewed":
+      arr.sort((a, b) => {
+        if (a.views !== b.views) return b.views - a.views;
+        if (a.created_at !== b.created_at)
+          return a.created_at < b.created_at ? 1 : -1;
+        return a.id < b.id ? 1 : -1;
+      });
+      break;
+    case "newest":
+    default:
+      arr.sort((a, b) => {
+        if (a.created_at === b.created_at) return a.id < b.id ? 1 : -1;
+        return a.created_at < b.created_at ? 1 : -1;
+      });
+      break;
+  }
+  return arr;
+}
 
 export function HomeContent({
   models,
   platforms,
-  initialFeed,
+  allPosts,
+  allOwners,
   initialFolders,
   initialFolderDetail,
   initialLiked,
@@ -76,15 +165,9 @@ export function HomeContent({
   const progressRef = useRef(progress);
   progressRef.current = progress;
 
-  const [feed, setFeed] = useState<FeedData | null>(
-    initialFeed
-      ? {
-          posts: initialFeed.posts,
-          owners: initialFeed.owners,
-          nextCursor: initialFeed.nextCursor ?? null,
-        }
-      : null,
-  );
+  // Saved / liked stay as per-user fetches because they're not part of the
+  // pre-fetched public dataset. Discover view derives entirely from
+  // allPosts via the useMemo below — no refetch on filter changes.
   const [folders, setFolders] = useState<SaveFolderSummary[] | null>(
     initialFolders,
   );
@@ -101,7 +184,7 @@ export function HomeContent({
   );
 
   // When a post is unliked anywhere (heart toggled on a card), drop it from
-  // the cached liked list so the Liked view updates instantly — no refetch.
+  // the cached liked list so the Liked view updates instantly.
   useEffect(() => {
     setLiked((prev) => {
       if (!prev) return prev;
@@ -111,26 +194,52 @@ export function HomeContent({
     });
   }, [likedSet]);
 
-  const [loadingMore, setLoadingMore] = useState(false);
-  const loadMoreInFlight = useRef(false);
-  const requestId = useRef(0);
+  // Client-side filtered + sorted feed. Recomputes only when the dataset or
+  // a filter knob changes — all O(n) over ~hundreds of posts, well under
+  // a frame.
+  const filteredPosts = useMemo(
+    () => filterAndSortPosts(allPosts, state),
+    [allPosts, state],
+  );
 
-  // Fetch on filter changes (skip first render — server already provided initial data)
+  // Windowed slice — reveal more on scroll without paying the cost of
+  // rendering every card on first paint.
+  const [visibleCount, setVisibleCount] = useState(WINDOW_STEP);
+  // Reset window when the filter result list changes (different posts).
+  // Using length+first-id as a cheap signature — exact filter identity
+  // doesn't matter, only "did the list change."
+  const firstId = filteredPosts[0]?.id ?? "";
+  useEffect(() => {
+    setVisibleCount(WINDOW_STEP);
+  }, [firstId, filteredPosts.length]);
+
+  const windowedPosts = useMemo(
+    () => filteredPosts.slice(0, visibleCount),
+    [filteredPosts, visibleCount],
+  );
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((current) => {
+      if (current >= filteredPosts.length) return current;
+      return Math.min(current + WINDOW_STEP, filteredPosts.length);
+    });
+  }, [filteredPosts.length]);
+
+  // Per-user views (saved / liked) still need to refresh when the user
+  // switches into them or changes folder. Discover relies on the in-memory
+  // dataset so it never enters this effect.
   const isFirst = useRef(true);
+  const requestId = useRef(0);
   useEffect(() => {
     if (isFirst.current) {
       isFirst.current = false;
       return;
     }
+    if (state.view !== "saved" && state.view !== "liked") return;
 
     const id = ++requestId.current;
     const ac = new AbortController();
     progressRef.current.start();
-
-    // Saved-list view: keep prior folders visible while the API refreshes
-    // (so re-entry doesn't blank out). We deliberately do NOT paint
-    // cover-less synthetic placeholders — they used to flash broken-image
-    // tiles for the duration of the fetch.
 
     (async () => {
       try {
@@ -173,30 +282,6 @@ export function HomeContent({
               nextCursor: json.data.nextCursor ?? null,
             });
           }
-        } else {
-          const params = new URLSearchParams({ type: "image" });
-          if (state.model) params.set("model", state.model);
-          if (state.platform) params.set("platform", state.platform);
-          if (state.sort === "top") params.set("sort", "top");
-          else if (state.sort === "oldest") params.set("sort", "oldest");
-          else if (state.sort === "viewed") params.set("sort", "viewed");
-          if (state.q && state.q.trim()) params.set("q", state.q.trim());
-          params.set("limit", String(PAGE_SIZE));
-          const res = await fetch(`/api/posts?${params.toString()}`, {
-            signal: ac.signal,
-            cache: "no-store",
-          });
-          const json = await res.json();
-          if (id !== requestId.current) return;
-          if (json.success) {
-            setFeed({
-              posts: json.data.posts,
-              owners: json.data.owners,
-              nextCursor: json.data.nextCursor ?? null,
-            });
-            setFolders(null);
-            setFolderDetail(null);
-          }
         }
       } catch (err) {
         if ((err as { name?: string }).name === "AbortError") return;
@@ -209,54 +294,18 @@ export function HomeContent({
       ac.abort();
       progressRef.current.done();
     };
-  }, [state.view, state.model, state.platform, state.sort, state.folder, state.q]);
+  }, [state.view, state.folder]);
 
-  const loadMore = useCallback(async () => {
-    if (loadMoreInFlight.current) return;
-    if (!feed || !feed.nextCursor) return;
-    loadMoreInFlight.current = true;
-    setLoadingMore(true);
-    try {
-      const params = new URLSearchParams({ type: "image" });
-      if (state.model) params.set("model", state.model);
-      if (state.platform) params.set("platform", state.platform);
-      if (state.sort === "top") params.set("sort", "top");
-      else if (state.sort === "oldest") params.set("sort", "oldest");
-      else if (state.sort === "viewed") params.set("sort", "viewed");
-      if (state.q && state.q.trim()) params.set("q", state.q.trim());
-      params.set("limit", String(PAGE_SIZE));
-      params.set("cursor", feed.nextCursor);
-      const res = await fetch(`/api/posts?${params.toString()}`, {
-        cache: "no-store",
-      });
-      const json = await res.json();
-      if (json.success) {
-        const seen = new Set(feed.posts.map((p) => p.id));
-        const incoming = (json.data.posts as Post[]).filter(
-          (p) => !seen.has(p.id),
-        );
-        setFeed({
-          posts: [...feed.posts, ...incoming],
-          owners: { ...feed.owners, ...(json.data.owners as OwnerMap) },
-          nextCursor: json.data.nextCursor ?? null,
-        });
-      }
-    } catch {
-      // swallow — infinite scroll failures shouldn't disrupt the page
-    } finally {
-      loadMoreInFlight.current = false;
-      setLoadingMore(false);
-    }
-  }, [feed, state.model, state.platform, state.sort, state.q]);
-
+  const [loadingMoreLiked, setLoadingMoreLiked] = useState(false);
+  const loadMoreInFlight = useRef(false);
   const loadMoreLiked = useCallback(async () => {
     if (loadMoreInFlight.current) return;
     if (!liked || !liked.nextCursor) return;
     loadMoreInFlight.current = true;
-    setLoadingMore(true);
+    setLoadingMoreLiked(true);
     try {
       const params = new URLSearchParams();
-      params.set("limit", String(PAGE_SIZE));
+      params.set("limit", String(WINDOW_STEP));
       params.set("cursor", liked.nextCursor);
       const res = await fetch(`/api/liked?${params.toString()}`, {
         cache: "no-store",
@@ -277,9 +326,11 @@ export function HomeContent({
       // swallow — infinite scroll failures shouldn't disrupt the page
     } finally {
       loadMoreInFlight.current = false;
-      setLoadingMore(false);
+      setLoadingMoreLiked(false);
     }
   }, [liked]);
+
+  const hasMoreDiscover = visibleCount < filteredPosts.length;
 
   return (
     <>
@@ -301,13 +352,15 @@ export function HomeContent({
         <ContentBody
           state={state}
           isAuthed={isAuthed}
-          feed={feed}
+          discoverPosts={windowedPosts}
+          discoverOwners={allOwners}
+          hasMoreDiscover={hasMoreDiscover}
+          onLoadMoreDiscover={loadMore}
           folders={folders}
           folderDetail={folderDetail}
           liked={liked}
-          onLoadMore={loadMore}
           onLoadMoreLiked={loadMoreLiked}
-          loadingMore={loadingMore}
+          loadingMoreLiked={loadingMoreLiked}
         />
       </div>
     </>
@@ -317,25 +370,29 @@ export function HomeContent({
 interface BodyProps {
   state: ReturnType<typeof useFeedFilter>["state"];
   isAuthed: boolean;
-  feed: FeedData | null;
+  discoverPosts: Post[];
+  discoverOwners: OwnerMap;
+  hasMoreDiscover: boolean;
+  onLoadMoreDiscover: () => void;
   folders: SaveFolderSummary[] | null;
   folderDetail: InitialFolderDetail | null;
   liked: FeedData | null;
-  onLoadMore: () => void;
   onLoadMoreLiked: () => void;
-  loadingMore: boolean;
+  loadingMoreLiked: boolean;
 }
 
 function ContentBody({
   state,
   isAuthed,
-  feed,
+  discoverPosts,
+  discoverOwners,
+  hasMoreDiscover,
+  onLoadMoreDiscover,
   folders,
   folderDetail,
   liked,
-  onLoadMore,
   onLoadMoreLiked,
-  loadingMore,
+  loadingMoreLiked,
 }: BodyProps) {
   if (state.view === "liked") {
     if (!isAuthed) {
@@ -369,7 +426,7 @@ function ContentBody({
         ownerMap={liked.owners}
         onLoadMore={onLoadMoreLiked}
         hasMore={Boolean(liked.nextCursor)}
-        loadingMore={loadingMore}
+        loadingMore={loadingMoreLiked}
         showEndOfFeed={false}
       />
     );
@@ -426,11 +483,11 @@ function ContentBody({
 
   return (
     <FeedGrid
-      posts={feed?.posts ?? []}
-      ownerMap={feed?.owners ?? {}}
-      onLoadMore={onLoadMore}
-      hasMore={Boolean(feed?.nextCursor)}
-      loadingMore={loadingMore}
+      posts={discoverPosts}
+      ownerMap={discoverOwners}
+      onLoadMore={onLoadMoreDiscover}
+      hasMore={hasMoreDiscover}
+      loadingMore={false}
     />
   );
 }

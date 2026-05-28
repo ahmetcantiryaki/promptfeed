@@ -6,16 +6,16 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/prompt/"],
+        allow: ["/"],
         disallow: [
           "/admin",
           "/my-prompts",
           "/login",
           "/register",
           "/forgot-password",
+          "/reset-password",
           "/auth/",
           "/api/",
-          "/?view=saved",
         ],
       },
     ],

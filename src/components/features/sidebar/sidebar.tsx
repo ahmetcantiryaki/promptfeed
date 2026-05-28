@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, Bookmark, Heart } from "lucide-react";
-import type { Model, Platform } from "@/types/domain";
+import { Compass, Bookmark, Heart, X } from "lucide-react";
+import type { Model, Platform, Tag, TagAxis, TagsByAxis } from "@/types/domain";
+import { TAG_AXES, TAG_AXIS_LABEL } from "@/types/domain";
 import { LogoMark } from "@/components/ui/logo-mark";
 import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
@@ -13,6 +15,7 @@ import {
   type FeedFilterState,
 } from "@/components/providers/feed-filter-provider";
 import { useInteractions } from "@/components/providers/interactions-provider";
+import { buildCategoryUrl } from "@/lib/category-url";
 
 function OtherBadge({ size = 20 }: { size?: number }) {
   return <PlatformBadge platform="web" size={size} />;
@@ -24,6 +27,7 @@ export type SidebarVariant = "rail" | "drawer";
 interface SidebarProps {
   models: Model[];
   platforms: Platform[];
+  tagsByAxis: TagsByAxis;
   savedCount?: number;
   likedCount?: number;
 }
@@ -36,14 +40,15 @@ function deriveActiveRoute(
   pathname: string,
   state: FeedFilterState,
 ): SidebarRoute {
-  if (pathname !== "/") return null;
   if (state.view === "saved") return "saved";
   if (state.view === "liked") return "liked";
   if (
+    pathname === "/" &&
     state.view === "feed" &&
     !state.model &&
     !state.platform &&
-    state.sort === "newest"
+    state.sort === "newest" &&
+    !state.q
   ) {
     return "discover";
   }
@@ -55,34 +60,13 @@ interface NavEntry {
   label: string;
   Icon: typeof Compass;
   href: string;
-  patch: Partial<FeedFilterState>;
   authOnly?: boolean;
 }
 
 const MAIN_NAV: NavEntry[] = [
-  {
-    key: "discover",
-    label: "Discover",
-    Icon: Compass,
-    href: "/",
-    patch: { view: "feed", model: undefined, platform: undefined, sort: "newest", folder: undefined },
-  },
-  {
-    key: "liked",
-    label: "Liked",
-    Icon: Heart,
-    href: "/?view=liked",
-    patch: { view: "liked", folder: undefined },
-    authOnly: true,
-  },
-  {
-    key: "saved",
-    label: "Saved",
-    Icon: Bookmark,
-    href: "/?view=saved",
-    patch: { view: "saved", folder: undefined },
-    authOnly: true,
-  },
+  { key: "discover", label: "Discover", Icon: Compass, href: "/" },
+  { key: "liked", label: "Liked", Icon: Heart, href: "/?view=liked", authOnly: true },
+  { key: "saved", label: "Saved", Icon: Bookmark, href: "/?view=saved", authOnly: true },
 ];
 
 /**
@@ -92,6 +76,7 @@ const MAIN_NAV: NavEntry[] = [
 export function Sidebar({
   models,
   platforms,
+  tagsByAxis,
   savedCount,
   likedCount,
 }: SidebarProps) {
@@ -100,6 +85,7 @@ export function Sidebar({
       <SidebarBody
         models={models}
         platforms={platforms}
+        tagsByAxis={tagsByAxis}
         savedCount={savedCount}
         likedCount={likedCount}
         variant="rail"
@@ -111,33 +97,89 @@ export function Sidebar({
 export function SidebarBody({
   models,
   platforms,
+  tagsByAxis,
   savedCount,
   likedCount,
   variant = "rail",
 }: SidebarBodyProps) {
   const pathname = usePathname();
-  const { state, setFilter } = useFeedFilter();
-  const {
-    isAuthed,
-    liked,
-    saved,
-    requestSignInForNav,
-  } = useInteractions();
+  const { state } = useFeedFilter();
+  const { isAuthed, liked, saved, requestSignInForNav } = useInteractions();
   // Live counts: prefer client-side state once authed so toggling like/save
   // updates the badge immediately. Falls back to SSR-passed props for the
   // initial render of anonymous users.
   const liveLikedCount = isAuthed ? liked.size : likedCount;
   const liveSavedCount = isAuthed ? saved.size : savedCount;
   const activeRoute = deriveActiveRoute(pathname ?? "/", state);
-  const isHomePath = (pathname ?? "/") === "/";
   const isDrawer = variant === "drawer";
 
-  // Both rail and drawer own their own padding and vertical scroll so the
-  // body component is fully self-contained.
   const containerClass =
     "flex h-full min-h-0 flex-col gap-4 overflow-y-auto px-3 py-4";
-
   const itemPaddingY = isDrawer ? "py-2.5" : "py-[7px]";
+
+  // The currently-active path filter — used both for highlighting AND for
+  // building "preserve the other axis" links (e.g. clicking a model while
+  // a platform is already filtered keeps that platform).
+  const activeModel = state.view === "feed" ? state.model : undefined;
+  const activePlatform = state.view === "feed" ? state.platform : undefined;
+  const activeTags = state.view === "feed" ? state.tags : [];
+  const activeSort = state.view === "feed" ? state.sort : "newest";
+  const activeQ = state.view === "feed" ? state.q : undefined;
+  const activeTagSet = new Set(activeTags);
+
+  function modelHref(slug: string): string {
+    const isActive = activeModel === slug;
+    return buildCategoryUrl({
+      view: "feed",
+      model: isActive ? undefined : slug,
+      platform: activePlatform,
+      tags: activeTags,
+      sort: activeSort,
+      q: activeQ,
+    });
+  }
+
+  function platformHref(slug: string): string {
+    const isActive = activePlatform === slug;
+    return buildCategoryUrl({
+      view: "feed",
+      model: activeModel,
+      platform: isActive ? undefined : slug,
+      tags: activeTags,
+      sort: activeSort,
+      q: activeQ,
+    });
+  }
+
+  /**
+   * Toggle a tag in the active set — clicking an inactive tag adds it,
+   * clicking an active tag removes it. The URL preserves model/platform/sort/q
+   * so users can stack filters (e.g. midjourney + photoreal + portrait).
+   */
+  function tagHref(slug: string): string {
+    const isActive = activeTagSet.has(slug);
+    const nextTags = isActive
+      ? activeTags.filter((s) => s !== slug)
+      : [...activeTags, slug];
+    return buildCategoryUrl({
+      view: "feed",
+      model: activeModel,
+      platform: activePlatform,
+      tags: nextTags,
+      sort: activeSort,
+      q: activeQ,
+    });
+  }
+
+  /** URL with every selected tag stripped (model/platform/sort/q kept). */
+  const clearAllTagsHref = buildCategoryUrl({
+    view: "feed",
+    model: activeModel,
+    platform: activePlatform,
+    tags: [],
+    sort: activeSort,
+    q: activeQ,
+  });
 
   return (
     <div className={containerClass}>
@@ -150,7 +192,7 @@ export function SidebarBody({
       </Link>
 
       <nav className="flex flex-col gap-0.5">
-        {MAIN_NAV.map(({ key, label, Icon, href, patch, authOnly }) => {
+        {MAIN_NAV.map(({ key, label, Icon, href, authOnly }) => {
           const active = activeRoute === key;
           const count =
             key === "saved"
@@ -160,12 +202,10 @@ export function SidebarBody({
                 : undefined;
           const requiresAuth = Boolean(authOnly) && !isAuthed;
           return (
-            <FilterNavItem
+            <NavItem
               key={key}
               href={href}
-              isHomePath={isHomePath}
               active={active}
-              onSelect={() => setFilter(patch)}
               gateAuth={requiresAuth}
               onGatedAuth={() => requestSignInForNav(href)}
               className={cn(
@@ -183,7 +223,7 @@ export function SidebarBody({
                   {formatCount(count)}
                 </span>
               ) : null}
-            </FilterNavItem>
+            </NavItem>
           );
         })}
       </nav>
@@ -194,28 +234,23 @@ export function SidebarBody({
           name: m.name,
           count: m.post_count,
         }))}
-        activeSlug={state.view === "feed" ? state.model : undefined}
-        isHomePath={isHomePath}
+        activeSlug={activeModel}
         itemPaddingY={itemPaddingY}
-        onPick={(slug) =>
-          setFilter({
-            view: "feed",
-            model: state.model === slug ? undefined : slug,
-          })
-        }
+        buildHref={modelHref}
       />
 
       <PlatformsList
         platforms={platforms}
-        activeSlug={state.view === "feed" ? state.platform : undefined}
-        isHomePath={isHomePath}
+        activeSlug={activePlatform}
         itemPaddingY={itemPaddingY}
-        onPick={(slug) =>
-          setFilter({
-            view: "feed",
-            platform: state.platform === slug ? undefined : slug,
-          })
-        }
+        buildHref={platformHref}
+      />
+
+      <TagsList
+        tagsByAxis={tagsByAxis}
+        activeTags={activeTagSet}
+        buildHref={tagHref}
+        clearAllHref={clearAllTagsHref}
       />
 
       <footer
@@ -237,37 +272,32 @@ export function SidebarBody({
   );
 }
 
-interface FilterNavItemProps extends React.HTMLAttributes<HTMLAnchorElement> {
+interface NavItemProps extends React.HTMLAttributes<HTMLAnchorElement> {
   href: string;
-  /** When true, click is intercepted and dispatches state without navigation. */
-  isHomePath: boolean;
   active: boolean;
-  onSelect: () => void;
-  /** When true, click opens the sign-in dialog instead of navigating. */
   gateAuth?: boolean;
   onGatedAuth?: () => void;
   children: React.ReactNode;
 }
 
-function FilterNavItem({
+function NavItem({
   href,
-  isHomePath,
   active,
-  onSelect,
   gateAuth = false,
   onGatedAuth,
   children,
   className,
   ...rest
-}: FilterNavItemProps) {
+}: NavItemProps) {
   return (
-    <a
+    <Link
       {...rest}
       href={href}
+      prefetch
       aria-current={active ? "page" : undefined}
       className={className}
       onClick={(e) => {
-        // Allow cmd/ctrl/middle-click open-in-new-tab
+        // Respect open-in-new-tab modifiers.
         if (
           e.defaultPrevented ||
           e.metaKey ||
@@ -281,15 +311,11 @@ function FilterNavItem({
         if (gateAuth) {
           e.preventDefault();
           onGatedAuth?.();
-          return;
         }
-        if (!isHomePath) return; // let real navigation happen
-        e.preventDefault();
-        onSelect();
       }}
     >
       {children}
-    </a>
+    </Link>
   );
 }
 
@@ -302,15 +328,13 @@ interface ModelItem {
 function ModelsList({
   items,
   activeSlug,
-  isHomePath,
   itemPaddingY,
-  onPick,
+  buildHref,
 }: {
   items: ModelItem[];
   activeSlug?: string;
-  isHomePath: boolean;
   itemPaddingY: string;
-  onPick: (slug: string) => void;
+  buildHref: (slug: string) => string;
 }) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -319,14 +343,11 @@ function ModelsList({
       </div>
       {items.map((it) => {
         const active = it.slug === activeSlug;
-        const href = active ? "/" : `/?model=${it.slug}`;
         return (
-          <FilterNavItem
+          <NavItem
             key={it.slug}
-            href={href}
-            isHomePath={isHomePath}
+            href={buildHref(it.slug)}
             active={active}
-            onSelect={() => onPick(it.slug)}
             data-active={active ? "true" : undefined}
             className={cn(
               "flex items-center gap-2.5 rounded-[6px] px-2.5 text-[14px] font-medium text-text-subtle transition-colors hover:bg-hover hover:text-text data-[active=true]:bg-surface-2 data-[active=true]:font-semibold data-[active=true]:text-text",
@@ -342,9 +363,157 @@ function ModelsList({
             <span className="tabular-nums text-[11px] font-medium text-text-subtle">
               {formatCount(it.count)}
             </span>
-          </FilterNavItem>
+          </NavItem>
         );
       })}
+    </div>
+  );
+}
+
+interface TagsListProps {
+  tagsByAxis: TagsByAxis;
+  activeTags: ReadonlySet<string>;
+  buildHref: (slug: string) => string;
+  clearAllHref: string;
+}
+
+/**
+ * Compact tag taxonomy block. Three axes (Subject / Style / Use case)
+ * collapse into a horizontal tab switcher — only one axis's chip grid is
+ * visible at a time, keeping the sidebar's vertical footprint flat
+ * regardless of how the taxonomy grows.
+ *
+ * Selected tags surface ABOVE the tabs as removable chips so users always
+ * see what's filtering them, even when browsing a different axis.
+ */
+function TagsList({
+  tagsByAxis,
+  activeTags,
+  buildHref,
+  clearAllHref,
+}: TagsListProps) {
+  const [axisTab, setAxisTab] = useState<TagAxis>("subject");
+  const items = tagsByAxis[axisTab];
+
+  const allTagsBySlug = useMemo(() => {
+    const map = new Map<string, Tag>();
+    for (const axis of TAG_AXES) {
+      for (const tag of tagsByAxis[axis]) map.set(tag.slug, tag);
+    }
+    return map;
+  }, [tagsByAxis]);
+
+  const selectedChips = useMemo(() => {
+    const list: Tag[] = [];
+    for (const slug of activeTags) {
+      const tag = allTagsBySlug.get(slug);
+      if (tag) list.push(tag);
+    }
+    return list;
+  }, [activeTags, allTagsBySlug]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2 px-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-label">
+          Tags
+        </span>
+        {selectedChips.length > 0 ? (
+          <Link
+            href={clearAllHref}
+            prefetch
+            className="text-[10px] font-medium text-text-subtle hover:text-text"
+          >
+            Clear ({selectedChips.length})
+          </Link>
+        ) : null}
+      </div>
+
+      {/* Active tag chips — always visible while any are selected, regardless
+          of which axis tab is currently open. Click strips that one tag. */}
+      {selectedChips.length > 0 ? (
+        <div className="flex flex-wrap gap-1 px-2">
+          {selectedChips.map((tag) => (
+            <Link
+              key={tag.slug}
+              href={buildHref(tag.slug)}
+              prefetch
+              className="group inline-flex items-center gap-1 rounded-full border border-text bg-text px-2 py-[2px] text-[10.5px] font-semibold leading-none text-surface hover:opacity-90"
+              title={`Remove ${tag.name}`}
+            >
+              <span>{tag.name}</span>
+              <X className="h-2.5 w-2.5 opacity-80" strokeWidth={2.5} />
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Axis tab switcher — the only piece of "vertical chrome" the section
+          adds. Underline marks the active axis; clicking swaps the chip grid
+          beneath without affecting selection. */}
+      <div
+        role="tablist"
+        aria-label="Tag axis"
+        className="flex items-stretch border-b px-1"
+      >
+        {TAG_AXES.map((axis) => {
+          const active = axisTab === axis;
+          return (
+            <button
+              key={axis}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setAxisTab(axis)}
+              className={cn(
+                "relative flex-1 py-1.5 text-[11px] font-medium transition-colors",
+                active
+                  ? "text-text"
+                  : "text-text-subtle hover:text-text-muted",
+              )}
+            >
+              {TAG_AXIS_LABEL[axis]}
+              {active ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-1 -bottom-px h-[2px] rounded-full bg-text"
+                />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Chip grid — wraps inside the sidebar column. Active chips invert. */}
+      <div className="flex flex-wrap gap-1 px-2">
+        {items.map((tag) => {
+          const active = activeTags.has(tag.slug);
+          return (
+            <Link
+              key={tag.slug}
+              href={buildHref(tag.slug)}
+              prefetch
+              aria-pressed={active}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-[3px] text-[11px] font-medium leading-none transition-colors",
+                active
+                  ? "border-text bg-text text-surface hover:opacity-90"
+                  : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
+              )}
+            >
+              <span>{tag.name}</span>
+              <span
+                className={cn(
+                  "tabular-nums text-[9.5px] leading-none",
+                  active ? "opacity-70" : "text-text-subtle",
+                )}
+              >
+                {formatCount(tag.post_count)}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -352,15 +521,13 @@ function ModelsList({
 function PlatformsList({
   platforms,
   activeSlug,
-  isHomePath,
   itemPaddingY,
-  onPick,
+  buildHref,
 }: {
   platforms: Platform[];
   activeSlug?: string;
-  isHomePath: boolean;
   itemPaddingY: string;
-  onPick: (slug: string) => void;
+  buildHref: (slug: string) => string;
 }) {
   const list: Platform[] = platforms;
   return (
@@ -370,14 +537,11 @@ function PlatformsList({
       </div>
       {list.map((p) => {
         const active = p.slug === activeSlug;
-        const href = active ? "/" : `/?platform=${p.slug}`;
         return (
-          <FilterNavItem
+          <NavItem
             key={p.slug}
-            href={href}
-            isHomePath={isHomePath}
+            href={buildHref(p.slug)}
             active={active}
-            onSelect={() => onPick(p.slug)}
             data-active={active ? "true" : undefined}
             className={cn(
               "flex items-center gap-2.5 rounded-[6px] px-2.5 text-[14px] font-medium text-text-subtle transition-colors hover:bg-hover hover:text-text data-[active=true]:bg-surface-2 data-[active=true]:font-semibold data-[active=true]:text-text",
@@ -393,7 +557,7 @@ function PlatformsList({
             <span className="tabular-nums text-[11px] font-medium text-text-subtle">
               {formatCount(p.post_count)}
             </span>
-          </FilterNavItem>
+          </NavItem>
         );
       })}
     </div>

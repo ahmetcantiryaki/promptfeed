@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Post } from "@/types/domain";
+import { POSTS_WITH_TAGS_SELECT, flattenPostsWithTags } from "@/lib/posts";
 
 export interface MyPostStats {
   likes: number;
@@ -10,11 +11,11 @@ export async function listMyPosts(userId: string): Promise<Post[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("posts")
-    .select("*")
+    .select(POSTS_WITH_TAGS_SELECT)
     .eq("owner_id", userId)
     .order("posted_at", { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  return flattenPostsWithTags(data ?? []);
 }
 
 /**

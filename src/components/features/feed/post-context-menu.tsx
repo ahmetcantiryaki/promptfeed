@@ -49,7 +49,7 @@ export function PostContextMenuWrapper({ post, children, onOpenDetail }: Props) 
 
   async function share() {
     try {
-      const url = `${window.location.origin}/prompt/${post.id}`;
+      const url = `${window.location.origin}/prompt/${post.slug}`;
       await navigator.clipboard.writeText(url);
       toast.success("Link copied");
     } catch {

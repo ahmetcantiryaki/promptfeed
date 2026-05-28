@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database";
 import type { Model, Platform, Post } from "@/types/domain";
+import { POSTS_WITH_TAGS_SELECT, flattenPostsWithTags } from "@/lib/posts";
 
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 export type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
@@ -134,11 +135,11 @@ export async function listAllPosts(limit = 200): Promise<Post[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("posts")
-    .select("*")
+    .select(POSTS_WITH_TAGS_SELECT)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return data ?? [];
+  return flattenPostsWithTags(data ?? []);
 }
 
 export async function listReports(): Promise<ReportRow[]> {

@@ -12,7 +12,7 @@ import {
 import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Menu, X } from "lucide-react";
-import type { Model, Platform } from "@/types/domain";
+import type { Model, Platform, TagsByAxis } from "@/types/domain";
 import { SidebarBody } from "./sidebar";
 
 interface MobileSidebarContextValue {
@@ -61,6 +61,7 @@ export function MobileSidebarTrigger() {
 interface MobileSidebarDrawerProps {
   models: Model[];
   platforms: Platform[];
+  tagsByAxis: TagsByAxis;
   savedCount?: number;
   likedCount?: number;
 }
@@ -68,6 +69,7 @@ interface MobileSidebarDrawerProps {
 export function MobileSidebarDrawer({
   models,
   platforms,
+  tagsByAxis,
   savedCount,
   likedCount,
 }: MobileSidebarDrawerProps) {
@@ -103,6 +105,7 @@ export function MobileSidebarDrawer({
           <SidebarBody
             models={models}
             platforms={platforms}
+            tagsByAxis={tagsByAxis}
             savedCount={savedCount}
             likedCount={likedCount}
             variant="drawer"

@@ -37,6 +37,7 @@ import type {
   Post,
   Profile,
   SocialAccount,
+  TagsByAxis,
 } from "@/types/domain";
 import { AddPromptDialog } from "@/components/features/add-prompt/add-prompt-dialog";
 import { createClient } from "@/lib/supabase/browser";
@@ -57,6 +58,7 @@ interface Props {
   socials: SocialAccount[];
   models: Model[];
   platforms: Platform[];
+  tagsByAxis: TagsByAxis;
 }
 
 type SectionKey = "stats" | "prompts" | "users" | "reports" | "taxonomy";
@@ -112,6 +114,7 @@ export function AdminClient({
   socials,
   models,
   platforms,
+  tagsByAxis,
 }: Props) {
   const [section, setSection] = useState<SectionKey>("stats");
   const current = SECTIONS.find((s) => s.key === section) ?? SECTIONS[0]!;
@@ -166,6 +169,7 @@ export function AdminClient({
               socials={socials}
               models={models}
               platforms={platforms}
+              tagsByAxis={tagsByAxis}
             />
           ) : null}
           {section === "users" ? <UsersPanel profiles={profiles} /> : null}
@@ -339,6 +343,7 @@ function PromptsPanel({
   socials,
   models,
   platforms,
+  tagsByAxis,
 }: {
   posts: Post[];
   userId: string;
@@ -346,6 +351,7 @@ function PromptsPanel({
   socials: SocialAccount[];
   models: Model[];
   platforms: Platform[];
+  tagsByAxis: TagsByAxis;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -373,6 +379,7 @@ function PromptsPanel({
       socials={socials}
       models={models}
       platforms={platforms}
+      tagsByAxis={tagsByAxis}
     />
   );
 
@@ -472,7 +479,7 @@ function PromptsPanel({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Link
-                    href={`/prompt/${p.id}`}
+                    href={`/prompt/${p.slug}`}
                     target="_blank"
                     className="grid h-9 w-9 place-items-center rounded-[8px] border bg-surface text-text-muted hover:bg-hover hover:text-text"
                     aria-label="Open"
@@ -567,7 +574,7 @@ function PromptsPanel({
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1.5">
                       <Link
-                        href={`/prompt/${p.id}`}
+                        href={`/prompt/${p.slug}`}
                         target="_blank"
                         className="grid h-8 w-8 place-items-center rounded-[8px] border bg-surface text-text-muted hover:bg-hover hover:text-text"
                         aria-label="Open"

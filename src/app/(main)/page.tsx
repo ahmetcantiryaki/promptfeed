@@ -2,10 +2,9 @@ import type { Metadata } from "next";
 import { HomeContent } from "@/components/features/feed/home-content";
 import {
   getOwnerProfiles,
+  listAllPostsForFeed,
   listModelsAndPlatforms,
-  listPostsPaged,
   type OwnerMap,
-  type PostsCursor,
 } from "@/lib/posts";
 import {
   getFolderById,
@@ -15,41 +14,22 @@ import {
 } from "@/lib/folders";
 import { listLikedPosts } from "@/lib/interactions";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import {
-  canonicalQuery,
-  DEFAULT_OG_IMAGE,
-  DEFAULT_TWITTER_IMAGE,
-} from "@/lib/site";
-import { prettyModel, prettyPlatform } from "@/lib/labels";
+import { DEFAULT_OG_IMAGE, DEFAULT_TWITTER_IMAGE } from "@/lib/site";
 import type {
   Post,
-  PostSort,
   SaveFolder,
   SaveFolderSummary,
 } from "@/types/domain";
 
 interface SearchParams {
-  model?: string;
-  platform?: string;
   sort?: string;
   view?: string;
   folder?: string;
   q?: string;
+  tag?: string;
 }
 
-function parseSort(raw?: string): PostSort {
-  if (raw === "top") return "top";
-  if (raw === "oldest") return "oldest";
-  if (raw === "viewed") return "viewed";
-  return "newest";
-}
-
-function encodeCursor(cursor: PostsCursor | null): string | null {
-  if (!cursor) return null;
-  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64");
-}
-
-const HOME_CANONICAL_PARAMS = ["model", "platform", "sort"] as const;
+export const revalidate = 60;
 
 export async function generateMetadata({
   searchParams,
@@ -73,22 +53,14 @@ export async function generateMetadata({
       alternates: { canonical: "/" },
     };
   }
-  const canonical = `/${canonicalQuery(
-    params as Record<string, string | undefined>,
-    HOME_CANONICAL_PARAMS,
-  )}`;
-  const segments: string[] = [];
-  if (params.model) segments.push(prettyModel(params.model));
-  if (params.platform) segments.push(prettyPlatform(params.platform));
-  if (params.sort === "top") segments.push("Trend");
+  const sort = params.sort === "top" ? "top" : params.sort === "oldest" ? "oldest" : params.sort === "viewed" ? "viewed" : "newest";
+  const canonical = sort === "newest" ? "/" : `/?sort=${sort}`;
   const title =
-    segments.length > 0
-      ? `${segments.join(" · ")} prompts — discover example images`
+    sort === "top"
+      ? "Top AI image prompts — discover examples"
       : "Discover, copy, and remix AI image prompts";
   const description =
-    segments.length > 0
-      ? `Discover, copy, and remix prompts behind AI images made with ${segments.join(", ")}. A curated archive of the best examples from social media.`
-      : "Discover prompts behind AI images from social media in one feed. Thousands of curated prompts from GPT Image, Midjourney, Nano Banana, Flux, Sora, and more — copy and remix.";
+    "Discover prompts behind AI images from social media in one feed. Thousands of curated prompts from GPT Image, Midjourney, Nano Banana, Flux, Sora, and more — copy and remix.";
   return {
     title,
     description,
@@ -122,11 +94,8 @@ export default async function Home({
   const user = await getCurrentUser();
   const { models, platforms } = await listModelsAndPlatforms();
 
-  let initialFeed: {
-    posts: Post[];
-    owners: OwnerMap;
-    nextCursor: string | null;
-  } | null = null;
+  let initialAllPosts: Post[] = [];
+  let initialAllOwners: OwnerMap = {};
   let initialFolders: SaveFolderSummary[] | null = null;
   let initialFolderDetail:
     | { folder: SaveFolder; posts: Post[]; owners: OwnerMap }
@@ -169,33 +138,37 @@ export default async function Home({
         : null,
     };
   } else if (!isSavedView && !isLikedView) {
-    const { posts, nextCursor } = await listPostsPaged({
-      model: params.model,
-      platform: params.platform,
-      mediaType: "image",
-      sort: parseSort(params.sort),
-      limit: 30,
-      q: params.q?.trim() ? params.q.trim().slice(0, 80) : undefined,
-    });
-    const ownerIds = posts
+    // Discover view: fetch every image post in a single query. The client
+    // then runs filter / sort / search in memory via useMemo so toggling
+    // chips feels instant. The cap inside listAllPostsForFeed keeps the
+    // payload bounded if the corpus grows.
+    const all = await listAllPostsForFeed();
+    const ownerIds = all
       .map((p) => p.owner_id)
       .filter((id): id is string => Boolean(id));
-    const owners = await getOwnerProfiles(ownerIds);
-    initialFeed = {
-      posts,
-      owners,
-      nextCursor: encodeCursor(nextCursor),
-    };
+    initialAllPosts = all;
+    initialAllOwners = await getOwnerProfiles(ownerIds);
   }
 
+  const heading =
+    isLikedView
+      ? "Liked prompts"
+      : isSavedView
+        ? "Saved prompts"
+        : "Discover AI image prompts";
+
   return (
-    <HomeContent
-      models={models}
-      platforms={platforms}
-      initialFeed={initialFeed}
-      initialFolders={initialFolders}
-      initialFolderDetail={initialFolderDetail}
-      initialLiked={initialLiked}
-    />
+    <>
+      <h1 className="sr-only">{heading}</h1>
+      <HomeContent
+        models={models}
+        platforms={platforms}
+        allPosts={initialAllPosts}
+        allOwners={initialAllOwners}
+        initialFolders={initialFolders}
+        initialFolderDetail={initialFolderDetail}
+        initialLiked={initialLiked}
+      />
+    </>
   );
 }

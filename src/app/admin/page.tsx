@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { getProfile, getSocialAccounts } from "@/lib/profiles";
 import { listModelsAndPlatforms } from "@/lib/posts";
+import { listTagsByAxis } from "@/lib/tags";
 import {
   getPlatformStats,
   isAdmin,
@@ -24,17 +25,27 @@ export default async function AdminPage() {
   const admin = await isAdmin(user.id);
   if (!admin) notFound();
 
-  const [profile, profiles, reports, stats, posts, taxonomy, socials, mp] =
-    await Promise.all([
-      getProfile(user.id),
-      listAllProfilesWithEmail(),
-      listReports(),
-      getPlatformStats(),
-      listAllPosts(),
-      listTaxonomyForAdmin(),
-      getSocialAccounts(user.id),
-      listModelsAndPlatforms(),
-    ]);
+  const [
+    profile,
+    profiles,
+    reports,
+    stats,
+    posts,
+    taxonomy,
+    socials,
+    mp,
+    tagsByAxis,
+  ] = await Promise.all([
+    getProfile(user.id),
+    listAllProfilesWithEmail(),
+    listReports(),
+    getPlatformStats(),
+    listAllPosts(),
+    listTaxonomyForAdmin(),
+    getSocialAccounts(user.id),
+    listModelsAndPlatforms(),
+    listTagsByAxis(),
+  ]);
 
   return (
     <AdminClient
@@ -48,6 +59,7 @@ export default async function AdminPage() {
       socials={socials}
       models={mp.models}
       platforms={mp.platforms}
+      tagsByAxis={tagsByAxis}
     />
   );
 }

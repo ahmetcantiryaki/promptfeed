@@ -47,7 +47,7 @@ export function PostCardMenu({ post, tone = "light" }: Props) {
   async function share() {
     const url =
       typeof window !== "undefined"
-        ? `${window.location.origin}/prompt/${post.id}`
+        ? `${window.location.origin}/prompt/${post.slug}`
         : post.source_url;
     try {
       await navigator.clipboard.writeText(url);

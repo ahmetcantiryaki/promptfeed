@@ -9,14 +9,22 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useSearchParams } from "next/navigation";
-import type { PostSort } from "@/types/domain";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Model, Platform, PostSort } from "@/types/domain";
+import {
+  buildCategoryUrl,
+  decodeTagParam,
+  readPathFilter,
+  type FeedView,
+} from "@/lib/category-url";
 
-export type FeedView = "feed" | "saved" | "liked";
+export type { FeedView } from "@/lib/category-url";
 
 export interface FeedFilterState {
   model?: string;
   platform?: string;
+  /** Selected tag slugs (multi-select; AND-intersected at query time). */
+  tags: string[];
   sort: PostSort;
   view: FeedView;
   folder?: string;
@@ -32,102 +40,123 @@ export interface FeedFilterContextValue {
 
 const FeedFilterContext = createContext<FeedFilterContextValue | null>(null);
 
-function readUrlState(
-  search: URLSearchParams | string | null,
-): FeedFilterState {
-  const params =
-    search instanceof URLSearchParams
-      ? search
-      : new URLSearchParams(search ?? "");
-  return {
-    model: params.get("model") ?? undefined,
-    platform: params.get("platform") ?? undefined,
-    sort:
-      params.get("sort") === "top"
-        ? "top"
-        : params.get("sort") === "oldest"
-          ? "oldest"
-          : params.get("sort") === "viewed"
-            ? "viewed"
-            : "newest",
-    view:
-      params.get("view") === "saved"
-        ? "saved"
-        : params.get("view") === "liked"
-          ? "liked"
-          : "feed",
-    folder: params.get("folder") ?? undefined,
-    q: params.get("q") ?? undefined,
-  };
+function pickSort(raw: string | null | undefined): PostSort {
+  if (raw === "top") return "top";
+  if (raw === "oldest") return "oldest";
+  if (raw === "viewed") return "viewed";
+  return "newest";
 }
 
-function buildSearch(state: FeedFilterState): string {
-  const params = new URLSearchParams();
-  if (state.model) params.set("model", state.model);
-  if (state.platform) params.set("platform", state.platform);
-  if (state.sort === "top") params.set("sort", "top");
-  else if (state.sort === "oldest") params.set("sort", "oldest");
-  else if (state.sort === "viewed") params.set("sort", "viewed");
-  if (state.view === "saved") params.set("view", "saved");
-  else if (state.view === "liked") params.set("view", "liked");
-  if (state.folder) params.set("folder", state.folder);
-  if (state.q && state.q.trim()) params.set("q", state.q.trim());
-  return params.toString();
+function pickView(raw: string | null | undefined): FeedView {
+  return raw === "saved" ? "saved" : raw === "liked" ? "liked" : "feed";
 }
 
 interface ProviderProps {
   children: ReactNode;
+  models: Model[];
+  platforms: Platform[];
 }
 
-export function FeedFilterProvider({ children }: ProviderProps) {
+/**
+ * Filter state lives partially in the path (model + platform) and partially
+ * in the query string (sort, q, view, folder). Path changes trigger real
+ * Next.js navigation so the server can pre-render the category page with
+ * ISR; query-only changes use replaceState so the existing HomeContent
+ * useEffect handles a client-side refetch without a full route swap.
+ */
+export function FeedFilterProvider({
+  children,
+  models,
+  platforms,
+}: ProviderProps) {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [state, setState] = useState<FeedFilterState>(() =>
-    readUrlState(searchParams),
+  const router = useRouter();
+
+  const knownModels = useMemo(
+    () => new Set(models.map((m) => m.slug)),
+    [models],
+  );
+  const knownPlatforms = useMemo(
+    () => new Set(platforms.map((p) => p.slug)),
+    [platforms],
   );
 
-  // Re-sync if user uses browser back/forward
-  useEffect(() => {
-    const onPop = () => {
-      setState(readUrlState(window.location.search));
+  const readState = useCallback((): FeedFilterState => {
+    const pf = readPathFilter(pathname, knownModels, knownPlatforms);
+    const sp =
+      searchParams ??
+      (typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams());
+    return {
+      model: pf.model,
+      platform: pf.platform,
+      tags: decodeTagParam(sp.get("tag")),
+      sort: pickSort(sp.get("sort")),
+      view: pickView(sp.get("view")),
+      folder: sp.get("folder") ?? undefined,
+      q: sp.get("q") ?? undefined,
     };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [pathname, searchParams, knownModels, knownPlatforms]);
 
-  const writeUrl = useCallback((next: FeedFilterState) => {
-    const qs = buildSearch(next);
-    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    if (url !== window.location.pathname + window.location.search) {
-      window.history.replaceState(null, "", url);
-    }
-  }, []);
+  const [state, setState] = useState<FeedFilterState>(() => readState());
+
+  // Re-sync after router.push (pathname/searchParams change) and on
+  // back/forward navigation. This is what keeps the sidebar's "active
+  // model" highlight in sync with the URL after a category-link click.
+  useEffect(() => {
+    setState(readState());
+  }, [readState]);
 
   const setFilter = useCallback(
     (patch: Partial<FeedFilterState>) => {
       setState((prev) => {
-        const next = { ...prev, ...patch };
-        // Switching away from saved view also drops the folder.
+        const next: FeedFilterState = { ...prev, ...patch };
+        // Switching away from saved drops folder.
         if (patch.view !== undefined && next.view !== "saved") {
           next.folder = undefined;
         }
-        // Switching into saved/liked view: drop feed-only filters.
+        // Saved/Liked are user-private views that intentionally drop
+        // feed-only path filters, tag filters, and sort.
         if (next.view === "saved" || next.view === "liked") {
           next.model = undefined;
           next.platform = undefined;
+          next.tags = [];
           next.sort = "newest";
         }
-        writeUrl(next);
+
+        const targetUrl = buildCategoryUrl({
+          model: next.model,
+          platform: next.platform,
+          tags: next.tags,
+          sort: next.sort,
+          q: next.q,
+          view: next.view,
+          folder: next.folder,
+        });
+
+        if (typeof window !== "undefined") {
+          const targetPath = targetUrl.split("?")[0] ?? "/";
+          const currentPath = window.location.pathname;
+          const currentUrl = `${currentPath}${window.location.search}`;
+
+          if (targetPath !== currentPath) {
+            router.push(targetUrl);
+          } else if (targetUrl !== currentUrl) {
+            window.history.replaceState(null, "", targetUrl);
+          }
+        }
         return next;
       });
     },
-    [writeUrl],
+    [router],
   );
 
   const clearFilters = useCallback(() => {
-    const next: FeedFilterState = { sort: "newest", view: "feed" };
-    setState(next);
-    writeUrl(next);
-  }, [writeUrl]);
+    setState({ sort: "newest", view: "feed", tags: [] });
+    router.push("/");
+  }, [router]);
 
   const value = useMemo(
     () => ({ state, setFilter, clearFilters }),

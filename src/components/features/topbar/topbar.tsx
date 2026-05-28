@@ -6,6 +6,7 @@ import type {
   Platform,
   Profile,
   SocialAccount,
+  TagsByAxis,
 } from "@/types/domain";
 import { MobileSidebarTrigger } from "@/components/features/sidebar/mobile-sidebar-drawer";
 import { ThemeToggle } from "./theme-toggle";
@@ -21,6 +22,7 @@ interface Props {
   socials: SocialAccount[];
   models: Model[];
   platforms: Platform[];
+  tagsByAxis: TagsByAxis;
   isAdmin?: boolean;
 }
 
@@ -32,6 +34,7 @@ export function Topbar({
   socials,
   models,
   platforms,
+  tagsByAxis,
   isAdmin = false,
 }: Props) {
   return (
@@ -56,6 +59,7 @@ export function Topbar({
                 profile={profile}
                 models={models}
                 platforms={platforms}
+                tagsByAxis={tagsByAxis}
                 socials={socials}
               />
             ) : null}

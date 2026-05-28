@@ -8,9 +8,11 @@ import { ProfileSetupTrigger } from "@/components/features/profile/profile-setup
 import { InteractionsProvider } from "@/components/providers/interactions-provider";
 import { FeedFilterProvider } from "@/components/providers/feed-filter-provider";
 import { RouteProgressProvider } from "@/components/providers/route-progress-provider";
+import { TagsProvider } from "@/components/providers/tags-provider";
 import { BannedScreen } from "@/components/features/banned/banned-screen";
 import { SaveFolderModalsHost } from "@/components/features/save-folders/save-folder-modals-host";
 import { listModelsAndPlatforms } from "@/lib/posts";
+import { listTagsByAxis } from "@/lib/tags";
 import { getLikedPostIds } from "@/lib/interactions";
 import { getUserFoldersAndSaves } from "@/lib/folders";
 import { getCurrentUser } from "@/lib/supabase/auth";
@@ -28,7 +30,10 @@ export default async function MainLayout({
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser();
-  const { models, platforms } = await listModelsAndPlatforms();
+  const [{ models, platforms }, tagsByAxis] = await Promise.all([
+    listModelsAndPlatforms(),
+    listTagsByAxis(),
+  ]);
 
   const [profile, socials, likedIds, saveData, admin] = user
     ? await Promise.all([
@@ -65,13 +70,15 @@ export default async function MainLayout({
       initialFolders={saveData.folders}
       initialSaveByPostId={saveData.saveByPostId}
     >
-      <FeedFilterProvider>
+      <FeedFilterProvider models={models} platforms={platforms}>
+        <TagsProvider tagsByAxis={tagsByAxis}>
         <RouteProgressProvider>
         <MobileSidebarProvider>
           <div className="grid min-h-[100dvh] grid-cols-1 lg:grid-cols-[248px_1fr]">
             <Sidebar
               models={models}
               platforms={platforms}
+              tagsByAxis={tagsByAxis}
               savedCount={saveData.savedIds.length}
               likedCount={likedIds.length}
             />
@@ -85,6 +92,7 @@ export default async function MainLayout({
                   socials={socials}
                   models={models}
                   platforms={platforms}
+                  tagsByAxis={tagsByAxis}
                   isAdmin={admin}
                 />
               </div>
@@ -94,6 +102,7 @@ export default async function MainLayout({
             <MobileSidebarDrawer
               models={models}
               platforms={platforms}
+              tagsByAxis={tagsByAxis}
               savedCount={saveData.savedIds.length}
               likedCount={likedIds.length}
             />
@@ -111,6 +120,7 @@ export default async function MainLayout({
           </div>
         </MobileSidebarProvider>
         </RouteProgressProvider>
+        </TagsProvider>
       </FeedFilterProvider>
       {isBanned ? <BannedScreen /> : null}
     </InteractionsProvider>

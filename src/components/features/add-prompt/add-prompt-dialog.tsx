@@ -20,7 +20,10 @@ import type {
   Platform,
   Profile,
   SocialAccount,
+  TagsByAxis,
 } from "@/types/domain";
+import { MIN_TAGS_PER_POST } from "@/types/domain";
+import { TagAxisPicker } from "./tag-axis-picker";
 import { createClient } from "@/lib/supabase/browser";
 import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
@@ -30,6 +33,12 @@ import { tryParseJson, prettifyJson } from "@/lib/prompt-format";
 import { processImage } from "@/lib/image-processing";
 import { safeImageSrc } from "@/lib/safe-url";
 import { cn, formatCount } from "@/lib/utils";
+import {
+  deriveTitleFromPrompt,
+  slugify,
+  TITLE_MAX_LEN,
+  SLUG_MAX_LEN,
+} from "@/lib/slug";
 
 interface Props {
   open: boolean;
@@ -39,6 +48,7 @@ interface Props {
   socials: SocialAccount[];
   models: Model[];
   platforms: Platform[];
+  tagsByAxis: TagsByAxis;
 }
 
 const MAX_SIZE_MB = 5;
@@ -101,6 +111,7 @@ export function AddPromptDialog({
   socials: _socials,
   models,
   platforms,
+  tagsByAxis,
 }: Props) {
   const router = useRouter();
   const [promptType, setPromptType] = useState<PromptType>("standard");
@@ -114,8 +125,13 @@ export function AddPromptDialog({
   ]);
 
   const [prompt, setPrompt] = useState("");
+  const [title, setTitle] = useState("");
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [modelSlug, setModelSlug] = useState(models[0]?.slug ?? "");
   const [platformSlug, setPlatformSlug] = useState(platforms[0]?.slug ?? "");
+  const [tagSlugs, setTagSlugs] = useState<Set<string>>(() => new Set());
 
   const [creatorUrl, setCreatorUrl] = useState("");
   const parsedCreator = useMemo(
@@ -241,10 +257,26 @@ export function AddPromptDialog({
     });
     setExtras([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
     setPrompt("");
+    setTitle("");
+    setTitleTouched(false);
+    setSlug("");
+    setSlugTouched(false);
     setCreatorUrl("");
     setPromptType("standard");
+    setTagSlugs(new Set());
     setError(null);
   }
+
+  // Auto-fill title from prompt's first sentence until the user types in
+  // the title field — once they edit, we stop overwriting.
+  const previewTitle = useMemo(
+    () => (titleTouched ? title : deriveTitleFromPrompt(prompt)),
+    [titleTouched, title, prompt],
+  );
+  const previewSlug = useMemo(
+    () => (slugTouched ? slugify(slug) : slugify(previewTitle)),
+    [slugTouched, slug, previewTitle],
+  );
 
   function onOpenChangeInternal(next: boolean) {
     if (!next) reset();
@@ -324,6 +356,10 @@ export function AddPromptDialog({
       setError("Pick a model and a platform.");
       return;
     }
+    if (tagSlugs.size < MIN_TAGS_PER_POST) {
+      setError("Pick at least one tag.");
+      return;
+    }
     if (!parsedCreator) {
       setError("Paste a valid source URL (https://…).");
       return;
@@ -356,6 +392,18 @@ export function AddPromptDialog({
       const extCreatorPlatform = parsedCreator.platform;
 
       const supabase = createClient();
+      // The BEFORE INSERT trigger (migration 0011) derives + uniqueifies
+      // title/slug, but the regenerated types now require them NOT NULL. We
+      // always send the previewed values; the trigger still appends `-2`,
+      // `-3` … suffixes to slug on collision.
+      const finalTitle = (titleTouched ? title.trim() : previewTitle).slice(
+        0,
+        TITLE_MAX_LEN,
+      );
+      const finalSlug = (slugTouched ? slugify(slug) : previewSlug).slice(
+        0,
+        SLUG_MAX_LEN,
+      );
       const { error: insertErr } = await supabase.from("posts").insert({
         id: postId,
         owner_id: userId,
@@ -363,6 +411,8 @@ export function AddPromptDialog({
         media_type: "image",
         thumbnail_url: resultImage.thumbUrl,
         prompt: prompt.trim(),
+        title: finalTitle || "Untitled prompt",
+        slug: finalSlug || "prompt",
         model_slug: modelSlug,
         platform_slug: platformSlug,
         source_user: sourceUserLabel,
@@ -376,6 +426,22 @@ export function AddPromptDialog({
         external_creator_platform: extCreatorPlatform,
       });
       if (insertErr) throw insertErr;
+
+      // Attach tags. If this fails we clean up the orphan post so the user
+      // can retry with a clean slate (counter trigger reconciles itself).
+      const tagRows = Array.from(tagSlugs).map((slug) => ({
+        post_id: postId,
+        tag_slug: slug,
+      }));
+      if (tagRows.length > 0) {
+        const { error: tagsErr } = await supabase
+          .from("post_tags")
+          .insert(tagRows);
+        if (tagsErr) {
+          await supabase.from("posts").delete().eq("id", postId);
+          throw tagsErr;
+        }
+      }
 
       toast.success("Prompt published");
       reset();
@@ -425,6 +491,7 @@ export function AddPromptDialog({
     if (prompt.trim().length < 6) return false;
     if (prompt.length > PROMPT_MAX) return false;
     if (!modelSlug || !platformSlug) return false;
+    if (tagSlugs.size < MIN_TAGS_PER_POST) return false;
     if (!parsedCreator) return false;
     return !submitting;
   }, [
@@ -434,6 +501,7 @@ export function AddPromptDialog({
     prompt,
     modelSlug,
     platformSlug,
+    tagSlugs,
     parsedCreator,
     submitting,
   ]);
@@ -641,6 +709,57 @@ export function AddPromptDialog({
                 />
               </div>
 
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-2 text-[12px] font-medium text-text-muted">
+                  <span>Title (SEO)</span>
+                  <span className="text-[10px] text-text-subtle">
+                    {previewTitle.length}/{TITLE_MAX_LEN}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={titleTouched ? title : previewTitle}
+                  onFocus={() => {
+                    if (!titleTouched) {
+                      setTitle(previewTitle);
+                      setTitleTouched(true);
+                    }
+                  }}
+                  onChange={(e) => {
+                    setTitleTouched(true);
+                    setTitle(e.target.value.slice(0, TITLE_MAX_LEN));
+                  }}
+                  placeholder="Auto-derived from your prompt's first sentence"
+                  maxLength={TITLE_MAX_LEN}
+                  className="rounded-[10px] border bg-surface px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
+                />
+                <div className="flex items-center justify-between gap-2 text-[11px] text-text-subtle">
+                  <span>
+                    URL slug:{" "}
+                    <span className="font-mono text-text-muted">
+                      /prompt/{previewSlug || "auto-generated"}
+                    </span>
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={slugTouched ? slug : previewSlug}
+                  onFocus={() => {
+                    if (!slugTouched) {
+                      setSlug(previewSlug);
+                      setSlugTouched(true);
+                    }
+                  }}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    setSlug(e.target.value.toLowerCase().slice(0, SLUG_MAX_LEN));
+                  }}
+                  placeholder="auto-generated from title"
+                  maxLength={SLUG_MAX_LEN}
+                  className="rounded-[10px] border bg-surface px-3 py-2 font-mono text-[12px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[12px] font-medium text-text-muted">
@@ -667,6 +786,12 @@ export function AddPromptDialog({
                   />
                 </div>
               </div>
+
+              <TagAxisPicker
+                tagsByAxis={tagsByAxis}
+                selected={tagSlugs}
+                onChange={setTagSlugs}
+              />
 
               {error ? (
                 <div className="rounded-[8px] border border-red-500/40 bg-red-500/10 px-3 py-2 text-[12px] text-red-500">
