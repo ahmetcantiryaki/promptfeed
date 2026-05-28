@@ -1,18 +1,15 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, Bookmark, Heart, X } from "lucide-react";
+import { Compass, Bookmark, Heart } from "lucide-react";
 import type {
   Model,
   Platform,
-  Tag,
-  TagAxis,
   TagsByAxis,
   TagsMatchMode,
 } from "@/types/domain";
-import { TAG_AXES, TAG_AXIS_LABEL } from "@/types/domain";
 import { LogoMark } from "@/components/ui/logo-mark";
 import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
@@ -23,6 +20,7 @@ import {
 } from "@/components/providers/feed-filter-provider";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { buildCategoryUrl } from "@/lib/category-url";
+import { TagsFilterPanel } from "@/components/features/filter-bar/tags-filter-panel";
 
 function OtherBadge({ size = 20 }: { size?: number }) {
   return <PlatformBadge platform="web" size={size} />;
@@ -251,14 +249,20 @@ export function SidebarBody({
         buildHref={platformHref}
       />
 
-      <TagsList
-        tagsByAxis={tagsByAxis}
-        activeTags={activeTagSet}
-        tagsMode={state.tagsMode}
-        onToggleTag={onToggleTag}
-        onClearTags={onClearTags}
-        onSetTagsMode={onSetTagsMode}
-      />
+      <div className="flex flex-col gap-2">
+        <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-label">
+          Tags
+        </div>
+        <TagsFilterPanel
+          tagsByAxis={tagsByAxis}
+          activeTags={activeTagSet}
+          tagsMode={state.tagsMode}
+          onToggleTag={onToggleTag}
+          onClearTags={onClearTags}
+          onSetTagsMode={onSetTagsMode}
+          density="compact"
+        />
+      </div>
 
       <footer
         className={cn(
@@ -391,207 +395,9 @@ function ModelsList({
   );
 }
 
-interface TagsListProps {
-  tagsByAxis: TagsByAxis;
-  activeTags: ReadonlySet<string>;
-  tagsMode: TagsMatchMode;
-  onToggleTag: (slug: string) => void;
-  onClearTags: () => void;
-  onSetTagsMode: (mode: TagsMatchMode) => void;
-}
+// (TagsFilterPanel — co-located in features/filter-bar so the mobile filter
+//  dialog can render the same picker. Sidebar imports it above.)
 
-/**
- * Compact tag taxonomy block. Three axes (Subject / Style / Use case)
- * collapse into a horizontal tab switcher — only one axis's chip grid is
- * visible at a time, keeping the sidebar's vertical footprint flat
- * regardless of how the taxonomy grows.
- *
- * Selected tags surface ABOVE the tabs as removable chips so users always
- * see what's filtering them, even when browsing a different axis. The
- * "All / Any" toggle that appears alongside the chips controls how the
- * tag set composes (intersection vs union).
- *
- * Clicks fire `setFilter` directly (not `<Link>` navigations) — same path
- * URL changes go through `history.replaceState`, so the masonry stays in
- * place and there's no RSC refresh latency.
- */
-function TagsList({
-  tagsByAxis,
-  activeTags,
-  tagsMode,
-  onToggleTag,
-  onClearTags,
-  onSetTagsMode,
-}: TagsListProps) {
-  const [axisTab, setAxisTab] = useState<TagAxis>("subject");
-  const items = tagsByAxis[axisTab];
-
-  const allTagsBySlug = useMemo(() => {
-    const map = new Map<string, Tag>();
-    for (const axis of TAG_AXES) {
-      for (const tag of tagsByAxis[axis]) map.set(tag.slug, tag);
-    }
-    return map;
-  }, [tagsByAxis]);
-
-  const selectedChips = useMemo(() => {
-    const list: Tag[] = [];
-    for (const slug of activeTags) {
-      const tag = allTagsBySlug.get(slug);
-      if (tag) list.push(tag);
-    }
-    return list;
-  }, [activeTags, allTagsBySlug]);
-
-  // The All/Any control is meaningful only when 2+ tags compose; with one
-  // tag they're identical. We still render it after the first selection so
-  // users can pre-pick the mode they want before stacking.
-  const showMatchToggle = selectedChips.length >= 1;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2 px-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-label">
-          Tags
-        </span>
-        {selectedChips.length > 0 ? (
-          <button
-            type="button"
-            onClick={onClearTags}
-            className="text-[10px] font-medium text-text-subtle transition-colors hover:text-text"
-          >
-            Clear ({selectedChips.length})
-          </button>
-        ) : null}
-      </div>
-
-      {/* Active tag chips — always visible while any are selected, regardless
-          of which axis tab is currently open. Click strips that one tag. */}
-      {selectedChips.length > 0 ? (
-        <div className="flex flex-wrap gap-1 px-2">
-          {selectedChips.map((tag) => (
-            <button
-              key={tag.slug}
-              type="button"
-              onClick={() => onToggleTag(tag.slug)}
-              className="group inline-flex items-center gap-1 rounded-full border border-text bg-text px-2 py-[2px] text-[10.5px] font-semibold leading-none text-surface transition-opacity hover:opacity-90"
-              title={`Remove ${tag.name}`}
-            >
-              <span>{tag.name}</span>
-              <X className="h-2.5 w-2.5 opacity-80" strokeWidth={2.5} />
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {showMatchToggle ? (
-        <div className="flex items-center justify-between gap-2 px-2">
-          <span className="text-[9.5px] font-semibold uppercase tracking-[0.22em] text-text-subtle">
-            Match
-          </span>
-          <div
-            role="radiogroup"
-            aria-label="Tag match mode"
-            className="inline-flex overflow-hidden rounded-full border text-[10px] font-semibold uppercase tracking-[0.14em]"
-          >
-            {(["all", "any"] as const).map((mode) => {
-              const active = tagsMode === mode;
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => onSetTagsMode(mode)}
-                  className={cn(
-                    "px-2.5 py-[3px] transition-colors",
-                    active
-                      ? "bg-text text-surface"
-                      : "bg-surface text-text-subtle hover:bg-hover hover:text-text",
-                  )}
-                  title={
-                    mode === "all"
-                      ? "Show only posts that carry every selected tag"
-                      : "Show posts that carry any of the selected tags"
-                  }
-                >
-                  {mode}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Axis tab switcher — the only piece of "vertical chrome" the section
-          adds. Underline marks the active axis; clicking swaps the chip grid
-          beneath without affecting selection. */}
-      <div
-        role="tablist"
-        aria-label="Tag axis"
-        className="flex items-stretch border-b px-1"
-      >
-        {TAG_AXES.map((axis) => {
-          const active = axisTab === axis;
-          return (
-            <button
-              key={axis}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setAxisTab(axis)}
-              className={cn(
-                "relative flex-1 py-1.5 text-[11px] font-medium transition-colors",
-                active
-                  ? "text-text"
-                  : "text-text-subtle hover:text-text-muted",
-              )}
-            >
-              {TAG_AXIS_LABEL[axis]}
-              {active ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-x-1 -bottom-px h-[2px] rounded-full bg-text"
-                />
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Chip grid — wraps inside the sidebar column. Active chips invert. */}
-      <div className="flex flex-wrap gap-1 px-2">
-        {items.map((tag) => {
-          const active = activeTags.has(tag.slug);
-          return (
-            <button
-              key={tag.slug}
-              type="button"
-              onClick={() => onToggleTag(tag.slug)}
-              aria-pressed={active}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2 py-[3px] text-[11px] font-medium leading-none transition-colors",
-                active
-                  ? "border-text bg-text text-surface hover:opacity-90"
-                  : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
-              )}
-            >
-              <span>{tag.name}</span>
-              <span
-                className={cn(
-                  "tabular-nums text-[9.5px] leading-none",
-                  active ? "opacity-70" : "text-text-subtle",
-                )}
-              >
-                {formatCount(tag.post_count)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function PlatformsList({
   platforms,

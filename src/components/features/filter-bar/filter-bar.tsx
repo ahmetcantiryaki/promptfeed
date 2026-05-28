@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Search, SlidersHorizontal, X } from "lucide-react";
-import type { Model, Platform, PostSort } from "@/types/domain";
+import { ArrowLeftRight, Search, SlidersHorizontal, X } from "lucide-react";
+import type {
+  Model,
+  Platform,
+  PostSort,
+  Tag,
+  TagAxis,
+  TagsByAxis,
+  TagsMatchMode,
+} from "@/types/domain";
+import { TAG_AXES, TAG_AXIS_LABEL } from "@/types/domain";
 import { FilterDropdown, type FilterOption } from "./filter-dropdown";
 import { GridSizeSelector } from "./grid-size-selector";
 import { MobileGridSizeSelector } from "./mobile-grid-size-selector";
 import { useFeedFilter } from "@/components/providers/feed-filter-provider";
+import { useTags } from "@/components/providers/tags-provider";
 import { cn, formatCount } from "@/lib/utils";
 
 interface FilterBarProps {
@@ -24,17 +34,14 @@ const SORT_OPTIONS: FilterOption[] = [
 
 export function FilterBar({ models, platforms }: FilterBarProps) {
   const { state, setFilter } = useFeedFilter();
+  const { tagsByAxis } = useTags();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchInput, setSearchInput] = useState(state.q ?? "");
 
-  // Sync local input when the URL/state changes externally (back/forward,
-  // reset, etc).
   useEffect(() => {
     setSearchInput(state.q ?? "");
   }, [state.q]);
 
-  // Debounce: push the trimmed query into shared state 350ms after typing
-  // stops. Empty string clears the filter.
   useEffect(() => {
     const trimmed = searchInput.trim();
     const current = state.q ?? "";
@@ -65,16 +72,13 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
     [platforms],
   );
 
-  // Sort is always defined (default "newest" → "Latest"), so we don't hide
-  // it behind an undefined sentinel. activeCount still ignores "newest"
-  // so the Filters badge only ticks up for non-default sorts.
   const activeCount =
     [state.model, state.platform].filter(Boolean).length +
-    (state.sort !== "newest" ? 1 : 0);
+    (state.sort !== "newest" ? 1 : 0) +
+    (state.tags.length > 0 ? 1 : 0);
 
   return (
     <div className="flex items-center gap-2 border-b bg-surface px-3 py-3 sm:px-5 lg:px-7">
-      {/* Mobile: single filter button + compact search */}
       <div className="flex w-full items-center gap-2 md:hidden">
         <button
           type="button"
@@ -108,7 +112,6 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
         <MobileGridSizeSelector />
       </div>
 
-      {/* md+: full inline filter bar */}
       <div className="hidden flex-1 flex-wrap items-center gap-2 md:flex">
         <FilterDropdown
           activeValue={state.model}
@@ -151,94 +154,130 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
         <GridSizeSelector />
       </div>
 
-      <MobileFilterDialog
+      <MobileFilterModal
         open={mobileOpen}
         onOpenChange={setMobileOpen}
-        initialModel={state.model}
-        modelOptions={modelOptions}
-        initialPlatform={state.platform}
-        platformOptions={platformOptions}
-        initialSort={state.sort}
-        onApply={(next) => setFilter(next)}
+        models={models}
+        platforms={platforms}
+        tagsByAxis={tagsByAxis}
+        activeModel={state.model}
+        activePlatform={state.platform}
+        activeSort={state.sort}
+        activeTags={state.tags}
+        activeTagsMode={state.tagsMode}
+        activeCount={activeCount}
       />
     </div>
   );
 }
 
-interface DialogProps {
+interface ModalProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  initialModel: string | undefined;
-  modelOptions: FilterOption[];
-  initialPlatform: string | undefined;
-  platformOptions: FilterOption[];
-  initialSort: PostSort;
-  onApply: (next: {
-    model: string | undefined;
-    platform: string | undefined;
-    sort: PostSort;
-  }) => void;
+  models: Model[];
+  platforms: Platform[];
+  tagsByAxis: TagsByAxis;
+  activeModel: string | undefined;
+  activePlatform: string | undefined;
+  activeSort: PostSort;
+  activeTags: string[];
+  activeTagsMode: TagsMatchMode;
+  activeCount: number;
 }
 
-function MobileFilterDialog({
+/**
+ * Mobile filter modal — centered, fade-in animation handled by the shared
+ * `pf-modal-content` keyframes (no custom slide that fights the parent
+ * transform). Sized to span the viewport's vertical breathing room while
+ * leaving a soft inset, so the sheet reads as a panel rather than a
+ * full-screen takeover.
+ *
+ * NO horizontal scrolling anywhere — every section uses chip wrap. The
+ * Tags zone collapses three axes behind a single segmented selector so
+ * only one axis's chip grid is on-screen at a time; that's what lets all
+ * 30 tags fit without forcing the body to scroll.
+ *
+ * Everything is instant-apply: chip taps fire `setFilter` immediately and
+ * the URL updates via history.replaceState. "Done" just closes.
+ */
+function MobileFilterModal({
   open,
   onOpenChange,
-  initialModel,
-  modelOptions,
-  initialPlatform,
-  platformOptions,
-  initialSort,
-  onApply,
-}: DialogProps) {
-  // Draft state — only flushed to the URL/feed via onApply when the user
-  // taps "Show results". Selections inside the dialog don't refetch.
-  const [draftModel, setDraftModel] = useState<string | undefined>(initialModel);
-  const [draftPlatform, setDraftPlatform] = useState<string | undefined>(
-    initialPlatform,
+  models,
+  platforms,
+  tagsByAxis,
+  activeModel,
+  activePlatform,
+  activeSort,
+  activeTags,
+  activeTagsMode,
+  activeCount,
+}: ModalProps) {
+  const { setFilter, clearFilters } = useFeedFilter();
+  const [tagsAxis, setTagsAxis] = useState<TagAxis>("subject");
+
+  const activeTagSet = useMemo(() => new Set(activeTags), [activeTags]);
+
+  const onToggleTag = useCallback(
+    (slug: string) => {
+      const next = new Set(activeTags);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      setFilter({ tags: Array.from(next) });
+    },
+    [activeTags, setFilter],
   );
-  const [draftSort, setDraftSort] = useState<PostSort>(initialSort);
 
-  // Re-sync drafts each time the dialog opens so an unfinished selection
-  // from a previous open never leaks into the next session.
-  useEffect(() => {
-    if (open) {
-      setDraftModel(initialModel);
-      setDraftPlatform(initialPlatform);
-      setDraftSort(initialSort);
+  const onFlipMode = useCallback(() => {
+    setFilter({ tagsMode: activeTagsMode === "all" ? "any" : "all" });
+  }, [activeTagsMode, setFilter]);
+
+  const allTagsBySlug = useMemo(() => {
+    const map = new Map<string, Tag>();
+    for (const axis of TAG_AXES) {
+      for (const tag of tagsByAxis[axis] ?? []) map.set(tag.slug, tag);
     }
-  }, [open, initialModel, initialPlatform, initialSort]);
+    return map;
+  }, [tagsByAxis]);
 
-  const dirty =
-    draftModel !== initialModel ||
-    draftPlatform !== initialPlatform ||
-    draftSort !== initialSort;
-  const hasAny =
-    Boolean(draftModel) || Boolean(draftPlatform) || draftSort !== "newest";
+  const selectedTagCount = activeTagSet.size;
 
-  function reset() {
-    setDraftModel(undefined);
-    setDraftPlatform(undefined);
-    setDraftSort("newest");
-  }
+  // Per-axis selection dot — keeps the user oriented while switching axes.
+  const selectedPerAxis = useMemo(() => {
+    const counts: Record<TagAxis, number> = {
+      subject: 0,
+      style: 0,
+      use_case: 0,
+    };
+    for (const slug of activeTags) {
+      const tag = allTagsBySlug.get(slug);
+      if (tag) counts[tag.axis] += 1;
+    }
+    return counts;
+  }, [activeTags, allTagsBySlug]);
 
-  function apply() {
-    onApply({
-      model: draftModel,
-      platform: draftPlatform,
-      sort: draftSort,
-    });
-    onOpenChange(false);
-  }
+  const otherMode = activeTagsMode === "all" ? "any" : "all";
+  const currentAxisTags = tagsByAxis[tagsAxis] ?? [];
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="pf-modal-overlay fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm" />
-        <Dialog.Content className="pf-modal-content fixed left-1/2 top-1/2 z-[70] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[14px] border bg-surface shadow-2xl outline-none">
-          <header className="flex items-center justify-between border-b px-5 py-4">
-            <Dialog.Title className="text-[15px] font-semibold text-text">
-              Filters
-            </Dialog.Title>
+        <Dialog.Content
+          aria-describedby={undefined}
+          className="pf-modal-content fixed left-1/2 top-1/2 z-[70] flex max-h-[88dvh] w-[min(94vw,440px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[14px] border bg-surface shadow-2xl outline-none"
+        >
+          <header className="flex shrink-0 items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Dialog.Title className="text-[15px] font-semibold text-text">
+                Filters
+              </Dialog.Title>
+              {activeCount > 0 ? (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-text px-1.5 text-[10px] font-bold tabular-nums text-bg">
+                  {activeCount}
+                </span>
+              ) : null}
+            </div>
             <Dialog.Close asChild>
               <button
                 type="button"
@@ -250,51 +289,145 @@ function MobileFilterDialog({
             </Dialog.Close>
           </header>
 
-          <div className="flex flex-col gap-4 px-5 py-5">
-            <FilterField label="Model">
-              <RadioList
-                allLabel="All Models"
-                activeValue={draftModel}
-                options={modelOptions}
-                onChange={setDraftModel}
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-4 py-4">
+            <Section label="Model">
+              <ChoiceChip
+                label="All"
+                active={!activeModel}
+                onSelect={() => setFilter({ model: undefined })}
               />
-            </FilterField>
-            <FilterField label="Platform">
-              <RadioList
-                allLabel="All Platforms"
-                activeValue={draftPlatform}
-                options={platformOptions}
-                onChange={setDraftPlatform}
+              {models.map((m) => (
+                <ChoiceChip
+                  key={m.slug}
+                  label={m.name}
+                  active={activeModel === m.slug}
+                  onSelect={() => setFilter({ model: m.slug })}
+                />
+              ))}
+            </Section>
+
+            <Section label="Platform">
+              <ChoiceChip
+                label="All"
+                active={!activePlatform}
+                onSelect={() => setFilter({ platform: undefined })}
               />
-            </FilterField>
-            <FilterField label="Sort">
-              {/* No allLabel — sort is always defined, so we just show two
-                  options (Newest First / Top Liked) without an "All" row. */}
-              <RadioList
-                activeValue={draftSort}
-                options={SORT_OPTIONS}
-                onChange={(v) => setDraftSort((v as PostSort) ?? "newest")}
-              />
-            </FilterField>
+              {platforms.map((p) => (
+                <ChoiceChip
+                  key={p.slug}
+                  label={p.name}
+                  active={activePlatform === p.slug}
+                  onSelect={() => setFilter({ platform: p.slug })}
+                />
+              ))}
+            </Section>
+
+            <Section label="Sort">
+              {SORT_OPTIONS.map((o) => (
+                <ChoiceChip
+                  key={o.value}
+                  label={o.label}
+                  active={activeSort === o.value}
+                  onSelect={() =>
+                    setFilter({ sort: (o.value as PostSort) ?? "newest" })
+                  }
+                />
+              ))}
+            </Section>
+
+            <div className="flex flex-col gap-2 border-t pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+                  Tags
+                </span>
+                {selectedTagCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setFilter({ tags: [] })}
+                    className="text-[10.5px] font-medium text-text-subtle transition-colors hover:text-text"
+                  >
+                    Clear tags
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="flex gap-1">
+                {TAG_AXES.map((axis) => {
+                  const active = tagsAxis === axis;
+                  const dot = selectedPerAxis[axis];
+                  return (
+                    <button
+                      key={axis}
+                      type="button"
+                      onClick={() => setTagsAxis(axis)}
+                      aria-pressed={active}
+                      className={cn(
+                        "inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-2 py-1.5 text-[11.5px] font-medium transition-colors",
+                        active
+                          ? "border-text bg-text text-surface"
+                          : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
+                      )}
+                    >
+                      <span>{TAG_AXIS_LABEL[axis]}</span>
+                      {dot > 0 ? (
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "inline-block h-1.5 w-1.5 rounded-full",
+                            active ? "bg-surface" : "bg-text",
+                          )}
+                        />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {currentAxisTags.map((tag) => (
+                  <ChoiceChip
+                    key={tag.slug}
+                    label={tag.name}
+                    active={activeTagSet.has(tag.slug)}
+                    onSelect={() => onToggleTag(tag.slug)}
+                  />
+                ))}
+              </div>
+
+              {selectedTagCount >= 2 ? (
+                <button
+                  type="button"
+                  onClick={onFlipMode}
+                  className="mt-1 inline-flex w-fit items-center gap-1.5 self-end rounded-full border bg-surface px-2.5 py-1 text-[10.5px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+                  title={`Switch to "matching ${otherMode}"`}
+                >
+                  <span>matching {activeTagsMode}</span>
+                  <ArrowLeftRight
+                    className="h-3 w-3 opacity-60"
+                    strokeWidth={2.5}
+                  />
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          <footer className="flex items-center justify-between gap-2 border-t bg-surface-2/40 px-5 py-3">
+          <footer className="flex shrink-0 items-center justify-between gap-2 border-t bg-surface-2/40 px-4 py-3">
             <button
               type="button"
-              onClick={reset}
-              disabled={!hasAny}
+              onClick={clearFilters}
+              disabled={activeCount === 0}
               className="rounded-[8px] px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Reset
+              Reset all
             </button>
-            <button
-              type="button"
-              onClick={apply}
-              disabled={!dirty}
-              className="inline-flex items-center gap-1.5 rounded-[8px] bg-text px-3 py-1.5 text-[12px] font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Show results
-            </button>
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-[10px] bg-text px-5 py-2 text-[13px] font-semibold text-bg transition-opacity hover:opacity-90"
+              >
+                Done
+              </button>
+            </Dialog.Close>
           </footer>
         </Dialog.Content>
       </Dialog.Portal>
@@ -302,7 +435,8 @@ function MobileFilterDialog({
   );
 }
 
-function FilterField({
+/** Chip wrap row — never overflows horizontally, breaks to a new line. */
+function Section({
   label,
   children,
 }: {
@@ -311,59 +445,20 @@ function FilterField({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
         {label}
-      </span>
-      {children}
+      </div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );
 }
 
-interface RadioListProps {
-  /** When omitted, no "All" row is rendered (use for required-value fields
-   *  like sort, where every option always has a value). */
-  allLabel?: string;
-  activeValue: string | undefined;
-  options: FilterOption[];
-  onChange: (v: string | undefined) => void;
-}
-
-function RadioList({
-  allLabel,
-  activeValue,
-  options,
-  onChange,
-}: RadioListProps) {
-  return (
-    <div className="-mx-1 flex max-h-[32vh] flex-col overflow-y-auto">
-      {allLabel ? (
-        <RadioRow
-          label={allLabel}
-          active={!activeValue}
-          onSelect={() => onChange(undefined)}
-        />
-      ) : null}
-      {options.map((o) => (
-        <RadioRow
-          key={o.value}
-          label={o.label}
-          meta={o.meta}
-          active={o.value === activeValue}
-          onSelect={() => onChange(o.value)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function RadioRow({
+function ChoiceChip({
   label,
-  meta,
   active,
   onSelect,
 }: {
   label: string;
-  meta?: number;
   active: boolean;
   onSelect: () => void;
 }) {
@@ -373,29 +468,13 @@ function RadioRow({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "flex items-center gap-2.5 rounded-[8px] border px-3 py-2 text-left text-[13px] transition-colors",
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-medium leading-none transition-colors",
         active
-          ? "border-text bg-text/5 font-semibold text-text"
-          : "border-transparent text-text-muted hover:bg-hover hover:text-text",
+          ? "border-text bg-text text-surface hover:opacity-90"
+          : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
       )}
     >
-      <span
-        aria-hidden="true"
-        className={cn(
-          "grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 transition-colors",
-          active ? "border-text" : "border-border-strong",
-        )}
-      >
-        {active ? (
-          <span className="h-2 w-2 rounded-full bg-text" />
-        ) : null}
-      </span>
-      <span className="flex-1 truncate">{label}</span>
-      {meta !== undefined ? (
-        <span className="tabular-nums text-[11px] text-text-subtle">
-          {formatCount(meta)}
-        </span>
-      ) : null}
+      <span className="whitespace-nowrap">{label}</span>
     </button>
   );
 }
