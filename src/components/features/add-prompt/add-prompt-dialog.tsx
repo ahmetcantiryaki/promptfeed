@@ -13,6 +13,9 @@ import {
   Link as LinkIcon,
   Wand2,
   Braces,
+  Image as ImageIcon,
+  Film,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -39,6 +42,7 @@ import {
   TITLE_MAX_LEN,
   SLUG_MAX_LEN,
 } from "@/lib/slug";
+import { detectEmbedProvider } from "@/lib/video-embed";
 
 interface Props {
   open: boolean;
@@ -72,6 +76,27 @@ function hostnameFromUrl(raw: string): string | null {
 }
 
 type PromptType = "standard" | "remix";
+type MediaTypeSel = "image" | "video";
+
+function isHttpsUrl(raw: string): boolean {
+  const v = raw.trim();
+  if (!v) return false;
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+/** YouTube auto-poster: img.youtube.com/vi/{ID}/maxresdefault.jpg. */
+function youtubePosterFromUrl(url: string): string | null {
+  const watch = url.match(/[?&]v=([a-zA-Z0-9_-]{6,})/);
+  const youtu = url.match(/youtu\.be\/([a-zA-Z0-9_-]{6,})/i);
+  const embed = url.match(/youtube\.com\/(?:embed|shorts)\/([a-zA-Z0-9_-]{6,})/i);
+  const id = watch?.[1] ?? youtu?.[1] ?? embed?.[1] ?? null;
+  return id ? `https://img.youtube.com/vi/${id}/maxresdefault.jpg` : null;
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -114,6 +139,7 @@ export function AddPromptDialog({
   tagsByAxis,
 }: Props) {
   const router = useRouter();
+  const [mediaType, setMediaType] = useState<MediaTypeSel>("image");
   const [promptType, setPromptType] = useState<PromptType>("standard");
 
   const [result, setResult] = useState<FileSlot>(EMPTY_SLOT);
@@ -123,6 +149,23 @@ export function AddPromptDialog({
     EMPTY_SLOT,
     EMPTY_SLOT,
   ]);
+
+  // Video mode — pure-embed architecture. Video is referenced by source
+  // URL (provider iframe at render time) plus a poster image URL the
+  // card and modal use for the preview.
+  const [videoUrl, setVideoUrl] = useState("");
+  const [posterUrl, setPosterUrl] = useState("");
+  const [posterAutoFilled, setPosterAutoFilled] = useState(false);
+
+  const detectedProvider = useMemo(
+    () => (videoUrl.trim() ? detectEmbedProvider(videoUrl.trim()) : null),
+    [videoUrl],
+  );
+
+  // SEO/URL customization is collapsed by default to keep the form tight
+  // — title and slug are auto-derived from the prompt body and only need
+  // attention for the occasional override.
+  const [showSeo, setShowSeo] = useState(false);
 
   const [prompt, setPrompt] = useState("");
   const [title, setTitle] = useState("");
@@ -263,8 +306,28 @@ export function AddPromptDialog({
     setSlugTouched(false);
     setCreatorUrl("");
     setPromptType("standard");
+    setMediaType("image");
+    setVideoUrl("");
+    setPosterUrl("");
+    setPosterAutoFilled(false);
+    setShowSeo(false);
     setTagSlugs(new Set());
     setError(null);
+  }
+
+  function onChangeVideoUrl(next: string) {
+    setVideoUrl(next);
+    // Auto-fill poster from YouTube if the user hasn't touched it. Once
+    // they hand-edit posterUrl the autofill stops chasing them.
+    const yt = youtubePosterFromUrl(next);
+    if (yt && (posterUrl === "" || posterAutoFilled)) {
+      setPosterUrl(yt);
+      setPosterAutoFilled(true);
+    }
+  }
+  function onChangePosterUrl(next: string) {
+    setPosterUrl(next);
+    setPosterAutoFilled(false);
   }
 
   // Auto-fill title from prompt's first sentence until the user types in
@@ -336,13 +399,24 @@ export function AddPromptDialog({
 
   async function submit() {
     setError(null);
-    if (!slotIsFilled(result)) {
-      setError("Upload the result image or paste an image URL.");
-      return;
-    }
-    if (promptType === "remix" && !slotIsFilled(source)) {
-      setError("Remix prompts need the input image too.");
-      return;
+    if (mediaType === "image") {
+      if (!slotIsFilled(result)) {
+        setError("Upload the result image or paste an image URL.");
+        return;
+      }
+      if (promptType === "remix" && !slotIsFilled(source)) {
+        setError("Remix prompts need the input image too.");
+        return;
+      }
+    } else {
+      if (!isHttpsUrl(videoUrl)) {
+        setError("Paste the video URL (https://…).");
+        return;
+      }
+      if (!isHttpsUrl(posterUrl)) {
+        setError("Paste a poster image URL for the card preview.");
+        return;
+      }
     }
     if (prompt.trim().length < 6) {
       setError("Prompt must be at least 6 characters.");
@@ -368,20 +442,38 @@ export function AddPromptDialog({
     setSubmitting(true);
     try {
       const postId = crypto.randomUUID();
-      const resultImage = await resolveSlot(result, postId, "out");
-      if (!resultImage) throw new Error("Result image is missing.");
-      const sourceImage =
-        promptType === "remix" ? await resolveSlot(source, postId, "in") : null;
 
-      const extraUrls: string[] = [];
-      if (promptType === "standard") {
-        for (let i = 0; i < extras.length; i++) {
-          const slot = extras[i];
-          if (slot?.file) {
-            const uploaded = await uploadImage(slot.file, postId, `x${i + 1}`);
-            extraUrls.push(uploaded.mainUrl);
+      // Resolve media URLs depending on the chosen media type. Image mode
+      // uploads (or accepts external URLs) like before; video mode uses
+      // the source URL directly + a separate poster URL for the card.
+      let mainMediaUrl: string;
+      let thumbnailUrl: string;
+      let sourceImageUrl: string | null = null;
+      let extraUrls: string[] = [];
+
+      if (mediaType === "image") {
+        const resultImage = await resolveSlot(result, postId, "out");
+        if (!resultImage) throw new Error("Result image is missing.");
+        const sourceImage =
+          promptType === "remix"
+            ? await resolveSlot(source, postId, "in")
+            : null;
+        mainMediaUrl = resultImage.mainUrl;
+        thumbnailUrl = resultImage.thumbUrl;
+        sourceImageUrl = sourceImage?.mainUrl ?? null;
+
+        if (promptType === "standard") {
+          for (let i = 0; i < extras.length; i++) {
+            const slot = extras[i];
+            if (slot?.file) {
+              const uploaded = await uploadImage(slot.file, postId, `x${i + 1}`);
+              extraUrls.push(uploaded.mainUrl);
+            }
           }
         }
+      } else {
+        mainMediaUrl = videoUrl.trim();
+        thumbnailUrl = posterUrl.trim();
       }
 
       if (!parsedCreator) throw new Error("Source URL missing.");
@@ -404,12 +496,20 @@ export function AddPromptDialog({
         0,
         SLUG_MAX_LEN,
       );
+      const videoExtras =
+        mediaType === "video"
+          ? {
+              embed_provider:
+                detectedProvider ?? detectEmbedProvider(mainMediaUrl),
+            }
+          : {};
+
       const { error: insertErr } = await supabase.from("posts").insert({
         id: postId,
         owner_id: userId,
-        media_url: resultImage.mainUrl,
-        media_type: "image",
-        thumbnail_url: resultImage.thumbUrl,
+        media_url: mainMediaUrl,
+        media_type: mediaType,
+        thumbnail_url: thumbnailUrl,
         prompt: prompt.trim(),
         title: finalTitle || "Untitled prompt",
         slug: finalSlug || "prompt",
@@ -418,12 +518,13 @@ export function AddPromptDialog({
         source_user: sourceUserLabel,
         source_url: sourceLinkForPost,
         posted_at: new Date().toISOString(),
-        prompt_type: promptType,
-        source_image_url: sourceImage?.mainUrl ?? null,
+        prompt_type: mediaType === "video" ? "standard" : promptType,
+        source_image_url: sourceImageUrl,
         extra_image_urls: extraUrls,
         external_creator_handle: extCreatorHandle,
         external_creator_url: extCreatorUrl,
         external_creator_platform: extCreatorPlatform,
+        ...videoExtras,
       });
       if (insertErr) throw insertErr;
 
@@ -486,8 +587,13 @@ export function AddPromptDialog({
   const promptNearLimit = promptCount > PROMPT_MAX * 0.9;
 
   const canSubmit = useMemo(() => {
-    if (!slotIsFilled(result)) return false;
-    if (promptType === "remix" && !slotIsFilled(source)) return false;
+    if (mediaType === "image") {
+      if (!slotIsFilled(result)) return false;
+      if (promptType === "remix" && !slotIsFilled(source)) return false;
+    } else {
+      if (!isHttpsUrl(videoUrl)) return false;
+      if (!isHttpsUrl(posterUrl)) return false;
+    }
     if (prompt.trim().length < 6) return false;
     if (prompt.length > PROMPT_MAX) return false;
     if (!modelSlug || !platformSlug) return false;
@@ -495,9 +601,12 @@ export function AddPromptDialog({
     if (!parsedCreator) return false;
     return !submitting;
   }, [
+    mediaType,
     result,
     promptType,
     source,
+    videoUrl,
+    posterUrl,
     prompt,
     modelSlug,
     platformSlug,
@@ -543,8 +652,52 @@ export function AddPromptDialog({
           </div>
 
           <div className="grid grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1.05fr)_minmax(440px,1fr)]">
-            {/* LEFT: image area */}
+            {/* LEFT: media area (image upload OR video URL inputs) */}
             <div className="flex flex-col gap-3 overflow-y-auto border-b bg-surface-2/40 p-5 lg:border-b-0 lg:border-r">
+              {/* Media type segmented control — picks the entire flow. */}
+              <div
+                role="radiogroup"
+                aria-label="Media type"
+                className="inline-flex overflow-hidden rounded-[10px] border bg-surface p-0.5"
+              >
+                {(
+                  [
+                    { key: "image", label: "Image", Icon: ImageIcon },
+                    { key: "video", label: "Video", Icon: Film },
+                  ] as const
+                ).map(({ key, label, Icon }) => {
+                  const active = mediaType === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setMediaType(key)}
+                      className={cn(
+                        "inline-flex flex-1 items-center justify-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[13px] font-medium transition-colors",
+                        active
+                          ? "bg-text text-bg"
+                          : "text-text-muted hover:bg-hover hover:text-text",
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+                      <span>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {mediaType === "video" ? (
+                <VideoSection
+                  videoUrl={videoUrl}
+                  posterUrl={posterUrl}
+                  detectedProvider={detectedProvider}
+                  onChangeVideoUrl={onChangeVideoUrl}
+                  onChangePosterUrl={onChangePosterUrl}
+                />
+              ) : (
+                <>
               <label className="flex items-center gap-2.5 rounded-[10px] border bg-surface px-3 py-2 text-[13px] font-medium text-text">
                 <input
                   type="checkbox"
@@ -614,6 +767,8 @@ export function AddPromptDialog({
                   </div>
                 </div>
               ) : null}
+                </>
+              )}
             </div>
 
             {/* RIGHT: form */}
@@ -709,55 +864,86 @@ export function AddPromptDialog({
                 />
               </div>
 
+              {/* Title + URL slug — collapsed by default. They auto-derive
+                  from the prompt body, so most submissions never need to
+                  open this section. */}
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2 text-[12px] font-medium text-text-muted">
-                  <span>Title (SEO)</span>
-                  <span className="text-[10px] text-text-subtle">
-                    {previewTitle.length}/{TITLE_MAX_LEN}
+                <button
+                  type="button"
+                  onClick={() => setShowSeo((v) => !v)}
+                  aria-expanded={showSeo}
+                  className="flex items-center justify-between gap-2 rounded-[8px] py-1 text-[11px] font-medium text-text-subtle transition-colors hover:text-text"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <ChevronDown
+                      className={cn(
+                        "h-3 w-3 transition-transform",
+                        showSeo ? "rotate-0" : "-rotate-90",
+                      )}
+                      strokeWidth={2}
+                    />
+                    Customize title &amp; URL
                   </span>
-                </div>
-                <input
-                  type="text"
-                  value={titleTouched ? title : previewTitle}
-                  onFocus={() => {
-                    if (!titleTouched) {
-                      setTitle(previewTitle);
-                      setTitleTouched(true);
-                    }
-                  }}
-                  onChange={(e) => {
-                    setTitleTouched(true);
-                    setTitle(e.target.value.slice(0, TITLE_MAX_LEN));
-                  }}
-                  placeholder="Auto-derived from your prompt's first sentence"
-                  maxLength={TITLE_MAX_LEN}
-                  className="rounded-[10px] border bg-surface px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
-                />
-                <div className="flex items-center justify-between gap-2 text-[11px] text-text-subtle">
-                  <span>
-                    URL slug:{" "}
-                    <span className="font-mono text-text-muted">
-                      /prompt/{previewSlug || "auto-generated"}
+                  {!showSeo ? (
+                    <span className="truncate font-mono text-[10.5px] text-text-subtle">
+                      /prompt/{previewSlug || "auto"}
                     </span>
-                  </span>
-                </div>
-                <input
-                  type="text"
-                  value={slugTouched ? slug : previewSlug}
-                  onFocus={() => {
-                    if (!slugTouched) {
-                      setSlug(previewSlug);
-                      setSlugTouched(true);
-                    }
-                  }}
-                  onChange={(e) => {
-                    setSlugTouched(true);
-                    setSlug(e.target.value.toLowerCase().slice(0, SLUG_MAX_LEN));
-                  }}
-                  placeholder="auto-generated from title"
-                  maxLength={SLUG_MAX_LEN}
-                  className="rounded-[10px] border bg-surface px-3 py-2 font-mono text-[12px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
-                />
+                  ) : null}
+                </button>
+                {showSeo ? (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2 text-[12px] font-medium text-text-muted">
+                      <span>Title (SEO)</span>
+                      <span className="text-[10px] text-text-subtle">
+                        {previewTitle.length}/{TITLE_MAX_LEN}
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={titleTouched ? title : previewTitle}
+                      onFocus={() => {
+                        if (!titleTouched) {
+                          setTitle(previewTitle);
+                          setTitleTouched(true);
+                        }
+                      }}
+                      onChange={(e) => {
+                        setTitleTouched(true);
+                        setTitle(e.target.value.slice(0, TITLE_MAX_LEN));
+                      }}
+                      placeholder="Auto-derived from your prompt's first sentence"
+                      maxLength={TITLE_MAX_LEN}
+                      className="rounded-[10px] border bg-surface px-3 py-2 text-[13px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    />
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-text-subtle">
+                      <span>
+                        URL slug:{" "}
+                        <span className="font-mono text-text-muted">
+                          /prompt/{previewSlug || "auto-generated"}
+                        </span>
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={slugTouched ? slug : previewSlug}
+                      onFocus={() => {
+                        if (!slugTouched) {
+                          setSlug(previewSlug);
+                          setSlugTouched(true);
+                        }
+                      }}
+                      onChange={(e) => {
+                        setSlugTouched(true);
+                        setSlug(
+                          e.target.value.toLowerCase().slice(0, SLUG_MAX_LEN),
+                        );
+                      }}
+                      placeholder="auto-generated from title"
+                      maxLength={SLUG_MAX_LEN}
+                      className="rounded-[10px] border bg-surface px-3 py-2 font-mono text-[12px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    />
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -834,6 +1020,101 @@ export function AddPromptDialog({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+interface VideoSectionProps {
+  videoUrl: string;
+  posterUrl: string;
+  detectedProvider: string | null;
+  onChangeVideoUrl: (v: string) => void;
+  onChangePosterUrl: (v: string) => void;
+}
+
+/**
+ * Video-mode left column. Two URL fields (source URL + poster URL) plus
+ * a live provider hint and a small poster preview. No file upload — the
+ * pure-embed architecture renders the source URL inside an iframe, so
+ * we never host the video bytes ourselves.
+ */
+function VideoSection({
+  videoUrl,
+  posterUrl,
+  detectedProvider,
+  onChangeVideoUrl,
+  onChangePosterUrl,
+}: VideoSectionProps) {
+  const providerLabel = detectedProvider
+    ? detectedProvider === "x"
+      ? "X (Twitter)"
+      : detectedProvider === "youtube"
+        ? "YouTube"
+        : detectedProvider === "tiktok"
+          ? "TikTok"
+          : detectedProvider === "instagram"
+            ? "Instagram"
+            : detectedProvider === "reddit"
+              ? "Reddit"
+              : detectedProvider === "vimeo"
+                ? "Vimeo"
+                : detectedProvider
+    : null;
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2 text-[12px] font-medium text-text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <Film className="h-3.5 w-3.5" strokeWidth={2} />
+            Video source URL<span className="text-red-500">*</span>
+          </span>
+          {providerLabel ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
+              {providerLabel}
+            </span>
+          ) : videoUrl.trim() ? (
+            <span className="text-[10px] text-amber-500">
+              Unknown provider — will fall back to &ldquo;Open at source&rdquo;
+            </span>
+          ) : null}
+        </div>
+        <input
+          type="url"
+          value={videoUrl}
+          onChange={(e) => onChangeVideoUrl(e.target.value)}
+          placeholder="https://youtube.com/watch?v=… or any provider URL"
+          className="rounded-[10px] border bg-surface px-3 py-2.5 text-[13px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[12px] font-medium text-text-muted">
+          Poster image URL<span className="text-red-500">*</span>
+        </span>
+        <input
+          type="url"
+          value={posterUrl}
+          onChange={(e) => onChangePosterUrl(e.target.value)}
+          placeholder="https://… (used for the card preview)"
+          className="rounded-[10px] border bg-surface px-3 py-2.5 text-[13px] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30"
+        />
+        {posterUrl && safeImageSrc(posterUrl) ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <div className="mt-1 overflow-hidden rounded-[10px] border bg-black">
+            <img
+              src={posterUrl.trim()}
+              alt="Poster preview"
+              className="block aspect-[16/9] w-full object-cover"
+            />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="rounded-[10px] border bg-surface-2/40 px-3 py-2 text-[11px] leading-[1.5] text-text-subtle">
+        Videos embed via iframe — we never host the bytes. Paste any
+        public provider URL (YouTube, X, TikTok, Instagram, Reddit,
+        Vimeo) and a poster image for the card preview.
+      </div>
+    </div>
   );
 }
 
