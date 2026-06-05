@@ -16,6 +16,7 @@ import type {
   Model,
   Platform,
   PostSort,
+  PromptStatus,
   Tag,
   TagAxis,
   TagsByAxis,
@@ -24,6 +25,12 @@ import type {
 import { TAG_AXES, TAG_AXIS_LABEL } from "@/types/domain";
 import { FilterDropdown, type FilterOption } from "./filter-dropdown";
 import { FiltersDropdown } from "./filters-dropdown";
+import {
+  PromptStatusChips,
+  PromptStatusDropdown,
+  nextStatusSet,
+  type PromptStatusCounts,
+} from "./prompt-status-filter";
 import { GridSizeSelector } from "./grid-size-selector";
 import { MobileGridSizeSelector } from "./mobile-grid-size-selector";
 import { useFeedFilter } from "@/components/providers/feed-filter-provider";
@@ -33,6 +40,7 @@ import { cn, formatCount } from "@/lib/utils";
 interface FilterBarProps {
   models: Model[];
   platforms: Platform[];
+  statusCounts: PromptStatusCounts;
 }
 
 const SORT_OPTIONS: FilterOption[] = [
@@ -42,7 +50,7 @@ const SORT_OPTIONS: FilterOption[] = [
   { value: "viewed", label: "Most Viewed" },
 ];
 
-export function FilterBar({ models, platforms }: FilterBarProps) {
+export function FilterBar({ models, platforms, statusCounts }: FilterBarProps) {
   const { state, setFilter } = useFeedFilter();
   const { tagsByAxis } = useTags();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -91,7 +99,8 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
     [state.model, state.platform].filter(Boolean).length +
     (state.sort !== "newest" ? 1 : 0) +
     (state.tags.length > 0 ? 1 : 0) +
-    (state.mediaType ? 1 : 0);
+    (state.mediaType ? 1 : 0) +
+    (state.promptStatus.length > 0 ? 1 : 0);
 
   return (
     <div className="flex items-center gap-2 border-b bg-surface px-3 py-3 sm:px-5 lg:px-7">
@@ -152,7 +161,8 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
             setFilter({ sort: (v as PostSort | undefined) ?? "newest" })
           }
         />
-        <FiltersDropdown />
+        <FiltersDropdown statusCounts={statusCounts} />
+        <PromptStatusDropdown counts={statusCounts} />
         <label className="flex w-[240px] items-center gap-2 rounded-[10px] border bg-surface-2 px-3 py-1.5 transition-all focus-within:w-[320px] focus-within:border-border-strong">
           <Search
             className="h-3.5 w-3.5 shrink-0 text-text-subtle"
@@ -187,6 +197,8 @@ export function FilterBar({ models, platforms }: FilterBarProps) {
         activeTags={state.tags}
         activeTagsMode={state.tagsMode}
         activeMediaType={state.mediaType}
+        activePromptStatus={state.promptStatus}
+        statusCounts={statusCounts}
         activeCount={activeCount}
       />
     </div>
@@ -205,6 +217,8 @@ interface ModalProps {
   activeTags: string[];
   activeTagsMode: TagsMatchMode;
   activeMediaType: MediaType | undefined;
+  activePromptStatus: PromptStatus[];
+  statusCounts: PromptStatusCounts;
   activeCount: number;
 }
 
@@ -235,6 +249,8 @@ function MobileFilterModal({
   activeTags,
   activeTagsMode,
   activeMediaType,
+  activePromptStatus,
+  statusCounts,
   activeCount,
 }: ModalProps) {
   const { setFilter, clearFilters } = useFeedFilter();
@@ -376,6 +392,21 @@ function MobileFilterModal({
                 />
               ))}
             </Section>
+
+            <div className="flex flex-col gap-2 border-t pt-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+                Prompt status
+              </span>
+              <PromptStatusChips
+                selected={activePromptStatus}
+                counts={statusCounts}
+                onToggle={(s) =>
+                  setFilter({
+                    promptStatus: nextStatusSet(activePromptStatus, s),
+                  })
+                }
+              />
+            </div>
 
             <div className="flex flex-col gap-2 border-t pt-3">
               <div className="flex items-center justify-between">

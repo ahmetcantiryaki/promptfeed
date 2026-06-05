@@ -14,9 +14,10 @@ import {
   BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Post } from "@/types/domain";
+import type { Post, PromptStatus } from "@/types/domain";
 import type { OwnerInfo } from "@/lib/posts";
 import { cn, formatCount, timeAgo } from "@/lib/utils";
+import { promptStatusOf, PROMPT_STATUS_META } from "@/lib/prompt-status";
 import { ModelBadge } from "@/lib/model-icon";
 import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { prettyModel, prettyPlatform } from "@/lib/labels";
@@ -27,6 +28,8 @@ import { safeHref } from "@/lib/safe-url";
 import { trackPostView } from "@/lib/track-view";
 import { RemixCurtain } from "./remix-curtain";
 import { DetailImageSlider } from "./detail-image-slider";
+import { PromptStatusBadge } from "./prompt-status-badge";
+import { PromptNotShared } from "./prompt-not-shared";
 import { TagPillsRow } from "./tag-pills";
 import { VideoPlayer } from "@/components/ui/video-player";
 import { videoPosterUrl } from "@/lib/video";
@@ -52,6 +55,18 @@ export function PostDetailModal({
   const { setFilter } = useFeedFilter();
   const isLiked = post ? liked.has(post.id) : false;
   const isSaved = post ? saved.has(post.id) : false;
+  const status: PromptStatus = post
+    ? promptStatusOf(post.prompt_status)
+    : "verified";
+  // Resolved here (not just in the header) so the prompt panel can offer an
+  // "Open source" action for reference + estimated tiers.
+  const sourceUrl = post
+    ? safeHref(
+        post.source_url && !post.source_url.startsWith("promptfeed://")
+          ? post.source_url
+          : null,
+      )
+    : null;
 
   /**
    * Clicking a tag pill inside the modal jumps the feed to that single-tag
@@ -233,18 +248,24 @@ export function PostDetailModal({
 
               {/* RIGHT — details panel (stacks below image on mobile) */}
               <aside className="flex min-w-0 flex-col bg-surface md:overflow-hidden md:border-l">
-                <DetailHeader post={post} />
+                <DetailHeader post={post} status={status} />
 
                 <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-5 sm:py-5">
                   <div className="shrink-0 flex flex-col gap-3">
-                    <Field label="Model">
-                      <div className="flex items-center gap-2">
-                        <ModelBadge slug={post.model_slug} size={22} />
-                        <span className="text-[14px] font-semibold text-text">
-                          {prettyModel(post.model_slug)}
-                        </span>
-                      </div>
-                    </Field>
+                    {status === "reference" ? (
+                      <Field label="Content type">
+                        <PromptStatusBadge status={status} tone="tinted" />
+                      </Field>
+                    ) : (
+                      <Field label="Model">
+                        <div className="flex items-center gap-2">
+                          <ModelBadge slug={post.model_slug} size={22} />
+                          <span className="text-[14px] font-semibold text-text">
+                            {prettyModel(post.model_slug)}
+                          </span>
+                        </div>
+                      </Field>
+                    )}
                     {post.tag_slugs && post.tag_slugs.length > 0 ? (
                       <Field label="Tags">
                         <TagPillsRow
@@ -255,52 +276,16 @@ export function PostDetailModal({
                     ) : null}
                   </div>
 
-                  <div className="flex min-h-0 flex-1 flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
-                        Prompt
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {isJson ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
-                            <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
-                            JSON
-                          </span>
-                        ) : null}
-                        {/* Mobile-only inline copy — desktop has labelled buttons below */}
-                        <button
-                          type="button"
-                          onClick={copyPrompt}
-                          aria-label="Copy prompt"
-                          className="inline-flex h-7 items-center gap-1 rounded-[7px] border bg-surface-2 px-2 text-[11px] font-semibold text-text-muted transition-colors hover:bg-hover hover:text-text md:hidden"
-                        >
-                          <Copy className="h-3 w-3" strokeWidth={2} />
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                    <PromptBody post={post} parsedJson={parsedJson} />
-                    <div className="hidden items-center gap-2 md:flex">
-                      <button
-                        type="button"
-                        onClick={copyPrompt}
-                        className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
-                      >
-                        <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
-                        Copy prompt
-                      </button>
-                      {isJson ? (
-                        <button
-                          type="button"
-                          onClick={copyPromptAsJson}
-                          className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
-                        >
-                          <Braces className="h-3.5 w-3.5" strokeWidth={1.8} />
-                          Copy as JSON
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
+                  <PromptPanel
+                    status={status}
+                    post={post}
+                    parsedJson={parsedJson}
+                    isJson={isJson}
+                    sourceUrl={sourceUrl}
+                    onCopyPrompt={copyPrompt}
+                    onCopyJson={copyPromptAsJson}
+                    onSaveReference={() => toggleSave(post)}
+                  />
 
                   <div className="flex shrink-0 flex-wrap items-center gap-2 border-t py-3 ">
                     <ToggleStat
@@ -359,7 +344,7 @@ export function PostDetailModal({
   );
 }
 
-function DetailHeader({ post }: { post: Post }) {
+function DetailHeader({ post, status }: { post: Post; status: PromptStatus }) {
   // Header always links to the original source post — never to the
   // creator's profile, even when external_creator_url is present.
   const sourceUrl = safeHref(
@@ -410,6 +395,150 @@ function DetailHeader({ post }: { post: Post }) {
           <span>·</span>
           <span>{timeAgo(post.posted_at)}</span>
         </div>
+      </div>
+      <PromptStatusBadge
+        status={status}
+        tone="tinted"
+        className="mt-0.5 shrink-0"
+      />
+    </div>
+  );
+}
+
+interface PromptPanelProps {
+  status: PromptStatus;
+  post: Post;
+  parsedJson: unknown | null;
+  isJson: boolean;
+  sourceUrl: string | null;
+  onCopyPrompt: () => void;
+  onCopyJson: () => void;
+  onSaveReference: () => void;
+}
+
+/**
+ * The prompt area, switched by tier:
+ *   - reference → no prompt body; a "Prompt not shared" empty-state plus the
+ *     primary "Save reference" / "Open source" actions (never a copy button).
+ *   - verified / estimated → the prompt body with the tier's helper line and a
+ *     copy button labelled per tier ("Copy prompt" vs "Copy estimated prompt");
+ *     estimated also flags the approximation and offers "Open source".
+ */
+function PromptPanel({
+  status,
+  post,
+  parsedJson,
+  isJson,
+  sourceUrl,
+  onCopyPrompt,
+  onCopyJson,
+  onSaveReference,
+}: PromptPanelProps) {
+  const meta = PROMPT_STATUS_META[status];
+
+  if (status === "reference") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+          {meta.heading}
+        </div>
+        <PromptNotShared status={status} />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onSaveReference}
+            className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+          >
+            <Bookmark className="h-3.5 w-3.5" strokeWidth={1.8} />
+            Save reference
+          </button>
+          {sourceUrl ? (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+            >
+              <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.8} />
+              Open source
+            </a>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+            {meta.heading}
+          </div>
+          {status === "estimated" && meta.caveat ? (
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-2 py-[1px] text-[10px] font-semibold",
+                meta.tintedClass,
+              )}
+            >
+              {meta.caveat}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {isJson ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
+              <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
+              JSON
+            </span>
+          ) : null}
+          {/* Mobile-only inline copy — desktop has labelled buttons below */}
+          <button
+            type="button"
+            onClick={onCopyPrompt}
+            aria-label={meta.copyLabel ?? "Copy"}
+            className="inline-flex h-7 items-center gap-1 rounded-[7px] border bg-surface-2 px-2 text-[11px] font-semibold text-text-muted transition-colors hover:bg-hover hover:text-text md:hidden"
+          >
+            <Copy className="h-3 w-3" strokeWidth={2} />
+            Copy
+          </button>
+        </div>
+      </div>
+      <p className="text-[11.5px] leading-[1.45] text-text-subtle">
+        {meta.helper}
+      </p>
+      <PromptBody post={post} parsedJson={parsedJson} />
+      <div className="hidden flex-wrap items-center gap-2 md:flex">
+        <button
+          type="button"
+          onClick={onCopyPrompt}
+          className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+        >
+          <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
+          {meta.copyLabel}
+        </button>
+        {isJson ? (
+          <button
+            type="button"
+            onClick={onCopyJson}
+            className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+          >
+            <Braces className="h-3.5 w-3.5" strokeWidth={1.8} />
+            Copy as JSON
+          </button>
+        ) : null}
+        {status === "estimated" && sourceUrl ? (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+          >
+            <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.8} />
+            Open source
+          </a>
+        ) : null}
       </div>
     </div>
   );

@@ -17,6 +17,8 @@ export interface UpdatePostInput {
    *  from the title. Only sent when the admin explicitly edits it. */
   slug?: string;
   prompt?: string;
+  /** Trust tier — "verified" | "reference" | "estimated" (migration 0016). */
+  prompt_status?: string;
   model_slug?: string;
   platform_slug?: string;
   external_creator_handle?: string | null;

@@ -71,6 +71,31 @@ export interface SaveFolderSummary extends SaveFolder {
 
 export type PostSort = "newest" | "oldest" | "top" | "viewed";
 
+/**
+ * Prompt provenance / trust tier (migration 0016). Mirrors the DB CHECK
+ * constraint; the column is `text` so we narrow at the boundary:
+ *   - "verified"  → creator/source actually shared the prompt (copyable hero)
+ *   - "reference" → strong visual, prompt NOT shared (no copy; save/open only)
+ *   - "estimated" → Feedlens-generated approximation, never the original
+ * Presentation (labels, colors, helpers) lives in `@/lib/prompt-status`.
+ */
+export type PromptStatus = "verified" | "reference" | "estimated";
+
+/** Canonical display order — most-trusted first. */
+export const PROMPT_STATUSES: readonly PromptStatus[] = [
+  "verified",
+  "reference",
+  "estimated",
+];
+
+export const DEFAULT_PROMPT_STATUS: PromptStatus = "verified";
+
+export function isPromptStatus(value: unknown): value is PromptStatus {
+  return (
+    value === "verified" || value === "reference" || value === "estimated"
+  );
+}
+
 export interface PostFilters {
   model?: string;
   platform?: string;
@@ -84,6 +109,8 @@ export interface PostFilters {
   limit?: number;
   /** Free-text search across prompt body, source_user, and external creator handle/url. */
   q?: string;
+  /** Restrict to these prompt-status tiers (multi). Empty/undefined = all. */
+  promptStatus?: PromptStatus[];
 }
 
 // react-nice-avatar config shape

@@ -6,20 +6,22 @@ import {
   Bookmark,
   Folder,
   Heart,
-  Sparkles,
   Cpu,
   Globe,
 } from "lucide-react";
-import { formatCount } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import type {
   Model,
   Platform,
   Post,
   PostSort,
+  PromptStatus,
   SaveFolder,
   SaveFolderSummary,
 } from "@/types/domain";
+import { PROMPT_STATUSES } from "@/types/domain";
 import type { OwnerMap } from "@/lib/posts";
+import { promptStatusOf, PROMPT_STATUS_META } from "@/lib/prompt-status";
 import { FilterBar } from "@/components/features/filter-bar/filter-bar";
 import { FeedGrid } from "@/components/features/feed/feed-grid";
 import { SavedFoldersGrid } from "@/components/features/save-folders/saved-folders-grid";
@@ -83,6 +85,8 @@ function filterAndSortPosts(
   const term = state.q?.trim().toLowerCase() ?? "";
   const termRe = term ? new RegExp(escapeLikeForRegex(term), "i") : null;
   const requiredTags = state.tags.length > 0 ? state.tags : null;
+  const statuses =
+    state.promptStatus.length > 0 ? new Set(state.promptStatus) : null;
   const model = state.model;
   const platform = state.platform;
 
@@ -90,6 +94,7 @@ function filterAndSortPosts(
 
   const filtered = posts.filter((p) => {
     if (state.mediaType && p.media_type !== state.mediaType) return false;
+    if (statuses && !statuses.has(promptStatusOf(p.prompt_status))) return false;
     if (model && p.model_slug !== model) return false;
     if (platform && p.platform_slug !== platform) return false;
     if (requiredTags) {
@@ -216,18 +221,36 @@ export function HomeContent({
     [allPosts, state],
   );
 
-  // Headline counts that track the active filter. Lets the StatsStrip
-  // surface "127 prompts, 3 models, 2 platforms" instead of static totals
-  // so the user can see how restrictive the current combination is.
+  // Per-status totals over the whole corpus — the stable numbers shown on the
+  // "Prompt status" filter chips (independent of the active filter).
+  const globalStatusCounts = useMemo(() => {
+    const counts: Record<PromptStatus, number> = {
+      verified: 0,
+      reference: 0,
+      estimated: 0,
+    };
+    for (const p of allPosts) counts[promptStatusOf(p.prompt_status)] += 1;
+    return counts;
+  }, [allPosts]);
+
+  // Headline counts that track the active filter — split by prompt-status tier
+  // so the strip reads "424 Verified · 38 References · 24 Estimated" alongside
+  // the model / platform spread, surfacing how restrictive the combination is.
   const filteredStats = useMemo(() => {
     const modelSet = new Set<string>();
     const platformSet = new Set<string>();
+    const status: Record<PromptStatus, number> = {
+      verified: 0,
+      reference: 0,
+      estimated: 0,
+    };
     for (const p of filteredPosts) {
       modelSet.add(p.model_slug);
       platformSet.add(p.platform_slug);
+      status[promptStatusOf(p.prompt_status)] += 1;
     }
     return {
-      prompts: filteredPosts.length,
+      status,
       models: modelSet.size,
       platforms: platformSet.size,
     };
@@ -237,7 +260,8 @@ export function HomeContent({
       state.platform ||
       state.tags.length > 0 ||
       state.q ||
-      state.mediaType,
+      state.mediaType ||
+      state.promptStatus.length > 0,
   );
 
   // Windowed slice — reveal more on scroll without paying the cost of
@@ -373,7 +397,11 @@ export function HomeContent({
   return (
     <>
       {state.view === "feed" ? (
-        <FilterBarSticky models={models} platforms={platforms} />
+        <FilterBarSticky
+          models={models}
+          platforms={platforms}
+          statusCounts={globalStatusCounts}
+        />
       ) : null}
 
       <div className="px-3 pb-10 pt-4 sm:px-5 sm:pt-6 lg:px-7">
@@ -539,9 +567,11 @@ function ContentBody({
 function FilterBarSticky({
   models,
   platforms,
+  statusCounts,
 }: {
   models: Model[];
   platforms: Platform[];
+  statusCounts: Record<PromptStatus, number>;
 }) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [stuck, setStuck] = useState(false);
@@ -566,7 +596,11 @@ function FilterBarSticky({
         data-pf-filter-stuck={stuck ? "true" : "false"}
         className="sticky top-0 z-30 bg-surface md:top-[calc(60px-1px)]"
       >
-        <FilterBar models={models} platforms={platforms} />
+        <FilterBar
+          models={models}
+          platforms={platforms}
+          statusCounts={statusCounts}
+        />
       </div>
     </>
   );
@@ -643,27 +677,29 @@ function FoldersSkeletonGrid() {
 }
 
 interface StatsStripProps {
-  stats: { prompts: number; models: number; platforms: number };
+  stats: {
+    status: Record<PromptStatus, number>;
+    models: number;
+    platforms: number;
+  };
   filtering: boolean;
 }
 
 function StatsStrip({ stats, filtering }: StatsStripProps) {
-  const items: Array<{
+  const meta: Array<{
+    key: string;
     label: string;
     value: number;
     icon: React.ReactNode;
   }> = [
     {
-      label: "Prompts",
-      value: stats.prompts,
-      icon: <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />,
-    },
-    {
+      key: "models",
       label: "Models",
       value: stats.models,
       icon: <Cpu className="h-3.5 w-3.5" strokeWidth={2} />,
     },
     {
+      key: "platforms",
       label: "Platforms",
       value: stats.platforms,
       icon: <Globe className="h-3.5 w-3.5" strokeWidth={2} />,
@@ -671,9 +707,27 @@ function StatsStrip({ stats, filtering }: StatsStripProps) {
   ];
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 sm:mb-5">
-      {items.map((it) => (
+      {PROMPT_STATUSES.map((s) => (
         <span
-          key={it.label}
+          key={s}
+          className="inline-flex items-center gap-1.5 rounded-full border bg-surface-2/60 px-2.5 py-1 text-[12px] font-medium text-text-muted transition-colors"
+        >
+          <span
+            aria-hidden="true"
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              PROMPT_STATUS_META[s].dotClass,
+            )}
+          />
+          <span className="font-semibold tabular-nums text-text">
+            {formatCount(stats.status[s])}
+          </span>
+          <span>{PROMPT_STATUS_META[s].countLabel}</span>
+        </span>
+      ))}
+      {meta.map((it) => (
+        <span
+          key={it.key}
           className="inline-flex items-center gap-1.5 rounded-full border bg-surface-2/60 px-2.5 py-1 text-[12px] font-medium text-text-muted transition-colors"
         >
           <span className="text-text-subtle">{it.icon}</span>

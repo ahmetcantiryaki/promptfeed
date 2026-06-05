@@ -14,8 +14,18 @@
  * arguments. Builders never need that.
  */
 
-import type { MediaType, PostSort, TagsMatchMode } from "@/types/domain";
-import { DEFAULT_TAGS_MATCH_MODE, isTagsMatchMode } from "@/types/domain";
+import type {
+  MediaType,
+  PostSort,
+  PromptStatus,
+  TagsMatchMode,
+} from "@/types/domain";
+import {
+  DEFAULT_TAGS_MATCH_MODE,
+  isPromptStatus,
+  isTagsMatchMode,
+  PROMPT_STATUSES,
+} from "@/types/domain";
 
 export type FeedView = "feed" | "saved" | "liked";
 
@@ -28,6 +38,9 @@ export interface CategoryFilter {
   tagsMode?: TagsMatchMode;
   /** Image / video filter. Undefined = both (the new default). */
   mediaType?: MediaType;
+  /** Included prompt-status tiers (multi). Empty / all = no filter. Encoded
+   *  as `?status=verified,reference`. */
+  promptStatus?: PromptStatus[];
   sort?: PostSort;
   q?: string;
   view?: FeedView;
@@ -68,6 +81,33 @@ export function decodeMediaTypeParam(
   return undefined;
 }
 
+/** Comma-separated prompt-status tiers. Empty OR all-three === no filter, so
+ *  both collapse to `null` (param omitted) — the feed shows every tier. */
+function encodeStatusParam(
+  statuses: readonly PromptStatus[] | undefined,
+): string | null {
+  if (!statuses || statuses.length === 0) return null;
+  const set = new Set(statuses.filter(isPromptStatus));
+  if (set.size === 0 || set.size >= PROMPT_STATUSES.length) return null;
+  return PROMPT_STATUSES.filter((s) => set.has(s)).join(",");
+}
+
+/** Read `?status=verified,reference,…`. Returns the canonical-ordered subset;
+ *  empty or all-three collapses to `[]` (= no filter, every tier shown). */
+export function decodeStatusParam(
+  raw: string | null | undefined,
+): PromptStatus[] {
+  if (!raw) return [];
+  const set = new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(isPromptStatus),
+  );
+  if (set.size === 0 || set.size >= PROMPT_STATUSES.length) return [];
+  return PROMPT_STATUSES.filter((s) => set.has(s));
+}
+
 export function buildCategoryUrl(f: CategoryFilter): string {
   if (f.view === "liked" || f.view === "saved") {
     const params = new URLSearchParams();
@@ -97,6 +137,8 @@ export function buildCategoryUrl(f: CategoryFilter): string {
     params.set("match", f.tagsMode);
   }
   if (f.mediaType) params.set("type", f.mediaType);
+  const statusParam = encodeStatusParam(f.promptStatus);
+  if (statusParam) params.set("status", statusParam);
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
 }

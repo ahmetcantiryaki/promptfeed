@@ -15,6 +15,7 @@ import type {
   Model,
   Platform,
   PostSort,
+  PromptStatus,
   TagsMatchMode,
 } from "@/types/domain";
 import { DEFAULT_TAGS_MATCH_MODE } from "@/types/domain";
@@ -22,6 +23,7 @@ import {
   buildCategoryUrl,
   decodeMatchParam,
   decodeMediaTypeParam,
+  decodeStatusParam,
   decodeTagParam,
   readPathFilter,
   type FeedView,
@@ -38,6 +40,8 @@ export interface FeedFilterState {
   tagsMode: TagsMatchMode;
   /** "image" / "video" / undefined (= both). */
   mediaType?: MediaType;
+  /** Included prompt-status tiers. Empty = every tier (no filter). */
+  promptStatus: PromptStatus[];
   sort: PostSort;
   view: FeedView;
   folder?: string;
@@ -108,6 +112,7 @@ export function FeedFilterProvider({
       tags: decodeTagParam(sp.get("tag")),
       tagsMode: decodeMatchParam(sp.get("match")),
       mediaType: decodeMediaTypeParam(sp.get("type")),
+      promptStatus: decodeStatusParam(sp.get("status")),
       sort: pickSort(sp.get("sort")),
       view: pickView(sp.get("view")),
       folder: sp.get("folder") ?? undefined,
@@ -140,6 +145,7 @@ export function FeedFilterProvider({
           next.tags = [];
           next.tagsMode = DEFAULT_TAGS_MATCH_MODE;
           next.mediaType = undefined;
+          next.promptStatus = [];
           next.sort = "newest";
         }
         // Whenever the tag set empties the mode resets too — `match=any`
@@ -154,6 +160,7 @@ export function FeedFilterProvider({
           tags: next.tags,
           tagsMode: next.tagsMode,
           mediaType: next.mediaType,
+          promptStatus: next.promptStatus,
           sort: next.sort,
           q: next.q,
           view: next.view,
@@ -183,6 +190,7 @@ export function FeedFilterProvider({
       view: "feed",
       tags: [],
       tagsMode: DEFAULT_TAGS_MATCH_MODE,
+      promptStatus: [],
     });
     router.push("/");
   }, [router]);

@@ -268,6 +268,7 @@ export type Database = {
           platform_slug: string
           posted_at: string
           prompt: string
+          prompt_status: string
           prompt_type: string
           scraped_at: string
           shares: number
@@ -298,6 +299,7 @@ export type Database = {
           platform_slug: string
           posted_at: string
           prompt: string
+          prompt_status?: string
           prompt_type?: string
           scraped_at?: string
           shares?: number
@@ -328,6 +330,7 @@ export type Database = {
           platform_slug?: string
           posted_at?: string
           prompt?: string
+          prompt_status?: string
           prompt_type?: string
           scraped_at?: string
           shares?: number

@@ -13,8 +13,9 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Post, Tag, TagAxis, TagsByAxis } from "@/types/domain";
-import { MIN_TAGS_PER_POST, TAG_AXES } from "@/types/domain";
+import type { Post, PromptStatus, Tag, TagAxis, TagsByAxis } from "@/types/domain";
+import { MIN_TAGS_PER_POST, PROMPT_STATUSES, TAG_AXES } from "@/types/domain";
+import { PROMPT_STATUS_META, promptStatusOf } from "@/lib/prompt-status";
 import { createClient } from "@/lib/supabase/browser";
 import {
   applyPostTagsDiff,
@@ -116,6 +117,9 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
   const [slug, setSlug] = useState(post.slug);
   const [modelSlug, setModelSlug] = useState(post.model_slug);
   const [platformSlug, setPlatformSlug] = useState(post.platform_slug);
+  const [promptStatus, setPromptStatus] = useState<PromptStatus>(
+    promptStatusOf(post.prompt_status),
+  );
   const [extHandle, setExtHandle] = useState(
     post.external_creator_handle ?? "",
   );
@@ -147,6 +151,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
     setSlug(post.slug);
     setModelSlug(post.model_slug);
     setPlatformSlug(post.platform_slug);
+    setPromptStatus(promptStatusOf(post.prompt_status));
     setExtHandle(post.external_creator_handle ?? "");
     setExtUrl(post.external_creator_url ?? "");
     setExtPlatform(post.external_creator_platform ?? "");
@@ -298,7 +303,7 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
 
   async function save() {
     setError(null);
-    if (prompt.trim().length < 6) {
+    if (promptStatus !== "reference" && prompt.trim().length < 6) {
       setError("Prompt must be at least 6 characters.");
       return;
     }
@@ -323,7 +328,9 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
     setSaving(true);
     try {
       const patch: UpdatePostInput = {
-        prompt: prompt.trim(),
+        // References carry no prompt; clearing keeps the data honest to the tier.
+        prompt: promptStatus === "reference" ? "" : prompt.trim(),
+        prompt_status: promptStatus,
         // Send title/slug only when changed; the trigger keeps existing
         // values if both are absent in the patch (UPDATE OF clause).
         ...(title.trim() && title.trim() !== post.title
@@ -615,12 +622,56 @@ export function EditPostDialog({ post, open, onOpenChange, onSaved }: Props) {
               </Field>
             </div>
 
-            <Field label="Prompt">
+            <Field label="Prompt status">
+              <div
+                role="radiogroup"
+                aria-label="Prompt status"
+                className="grid grid-cols-3 gap-1.5"
+              >
+                {PROMPT_STATUSES.map((s) => {
+                  const meta = PROMPT_STATUS_META[s];
+                  const active = promptStatus === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setPromptStatus(s)}
+                      className={cn(
+                        "inline-flex items-center justify-center gap-1.5 rounded-[8px] border px-2 py-1.5 text-[12px] font-medium transition-colors",
+                        active
+                          ? meta.tintedClass
+                          : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
+                      )}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "h-1.5 w-1.5 shrink-0 rounded-full",
+                          meta.dotClass,
+                        )}
+                      />
+                      <span className="truncate">{meta.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+
+            <Field
+              label={
+                promptStatus === "reference"
+                  ? "Prompt (cleared for references)"
+                  : "Prompt"
+              }
+            >
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={5}
-                className="w-full resize-y rounded-[10px] border bg-surface-2 px-3 py-2.5 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                disabled={promptStatus === "reference"}
+                className="w-full resize-y rounded-[10px] border bg-surface-2 px-3 py-2.5 text-[13px] text-text placeholder:text-text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
               />
             </Field>
 

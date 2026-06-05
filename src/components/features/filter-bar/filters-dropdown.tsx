@@ -12,6 +12,11 @@ import type { Tag } from "@/types/domain";
 import { TAG_AXES, TAG_AXIS_LABEL } from "@/types/domain";
 import { useFeedFilter } from "@/components/providers/feed-filter-provider";
 import { useTags } from "@/components/providers/tags-provider";
+import {
+  PromptStatusChips,
+  nextStatusSet,
+  type PromptStatusCounts,
+} from "./prompt-status-filter";
 import { cn, formatCount } from "@/lib/utils";
 
 /**
@@ -21,7 +26,11 @@ import { cn, formatCount } from "@/lib/utils";
  * Clear footer. Every toggle writes straight to the feed filter (URL-
  * synced) so the grid updates live behind the open panel.
  */
-export function FiltersDropdown() {
+export function FiltersDropdown({
+  statusCounts,
+}: {
+  statusCounts: PromptStatusCounts;
+}) {
   const { state, setFilter } = useFeedFilter();
   const { tagsByAxis } = useTags();
   const [open, setOpen] = useState(false);
@@ -151,6 +160,22 @@ export function FiltersDropdown() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Prompt status — keeps the trust filter beside the tag browser */}
+          <div className="flex flex-col gap-2 border-t px-4 py-3">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+              Prompt status
+            </span>
+            <PromptStatusChips
+              selected={state.promptStatus}
+              counts={statusCounts}
+              onToggle={(s) =>
+                setFilter({
+                  promptStatus: nextStatusSet(state.promptStatus, s),
+                })
+              }
+            />
           </div>
 
           {/* Selected tray + mode toggle + Done */}

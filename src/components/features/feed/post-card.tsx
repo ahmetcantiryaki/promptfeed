@@ -19,7 +19,9 @@ import { videoPosterUrl } from "@/lib/video";
 import { prettyModel } from "@/lib/labels";
 import { buildThumbCandidates } from "@/lib/image-srcset";
 import { useInteractions } from "@/components/providers/interactions-provider";
+import { promptStatusOf } from "@/lib/prompt-status";
 import { PostCardMenu } from "./post-card-menu";
+import { PromptStatusBadge } from "./prompt-status-badge";
 import { RemixCurtain } from "./remix-curtain";
 import { PostContextMenuWrapper } from "./post-context-menu";
 import { safeHref } from "@/lib/safe-url";
@@ -54,6 +56,9 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
   const viewCount = (post as Post & { views?: number | null }).views ?? 0;
 
   const isVideo = post.media_type === "video";
+  const status = promptStatusOf(post.prompt_status);
+  // Reference posts carry no prompt, so fall back to a meaningful alt.
+  const altText = post.prompt.slice(0, 80) || "Visual reference";
   const isRemix =
     !isVideo &&
     post.prompt_type === "remix" &&
@@ -88,33 +93,34 @@ export function PostCard({ post, owner: _owner, onOpen }: Props) {
           videoUrl={post.media_url}
           posterUrl={videoPosterUrl(post)}
           aspectRatio={post.aspect_ratio}
-          alt={post.prompt.slice(0, 80)}
+          alt={altText}
         />
       ) : isRemix ? (
         <RemixCurtain
           inputUrl={post.source_image_url as string}
           outputUrl={post.media_url}
-          alt={post.prompt.slice(0, 80)}
+          alt={altText}
           onClickArea={onOpen}
         />
       ) : hasExtras ? (
         <AutoSlider
           images={allImages}
           firstFallbacks={thumbCandidates.fallbacks}
-          alt={post.prompt.slice(0, 80)}
+          alt={altText}
         />
       ) : (
         <LazyImage
           src={thumbCandidates.primary}
           fallbackSrcs={thumbCandidates.fallbacks}
-          alt={post.prompt.slice(0, 80)}
+          alt={altText}
           minHeight={200}
           imgClassName="transition-transform duration-500 ease-out group-hover:scale-[1.04]"
         />
       )}
 
-      {/* Top-left compact badge — Remix OR +N images (never both) */}
-      <div className="pointer-events-none absolute left-2 top-2 z-30 flex items-center gap-1.5">
+      {/* Top-left badges — prompt-status trust pill always, then Remix / +N */}
+      <div className="pointer-events-none absolute left-2 top-2 z-30 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-1.5">
+        <PromptStatusBadge status={status} tone="glass" />
         {isRemix ? (
           <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur">
             <Wand2 className="h-3 w-3" strokeWidth={2} />

@@ -12,7 +12,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Post, SocialAccount } from "@/types/domain";
+import type { Post, PromptStatus, SocialAccount } from "@/types/domain";
 import type { OwnerInfo } from "@/lib/posts";
 import { cn, formatCount, timeAgo } from "@/lib/utils";
 import { ModelBadge } from "@/lib/model-icon";
@@ -20,10 +20,13 @@ import { PlatformBadge, isPlatformSlug } from "@/lib/platform-icon";
 import { prettyModel, prettyPlatform } from "@/lib/labels";
 import { useInteractions } from "@/components/providers/interactions-provider";
 import { tryParseJson, prettifyJson } from "@/lib/prompt-format";
+import { promptStatusOf, PROMPT_STATUS_META } from "@/lib/prompt-status";
 import { safeHref } from "@/lib/safe-url";
 import { trackPostView } from "@/lib/track-view";
 import { RemixCurtain } from "@/components/features/feed/remix-curtain";
 import { DetailImageSlider } from "@/components/features/feed/detail-image-slider";
+import { PromptStatusBadge } from "@/components/features/feed/prompt-status-badge";
+import { PromptNotShared } from "@/components/features/feed/prompt-not-shared";
 
 interface Props {
   post: Post;
@@ -46,6 +49,14 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
     post.shares + (isSaved ? 1 : 0) - (initialSavedRef.current ? 1 : 0);
   const isRemix = post.prompt_type === "remix" && Boolean(post.source_image_url);
   const hasExtras = !isRemix && (post.extra_image_urls?.length ?? 0) > 0;
+
+  const status = promptStatusOf(post.prompt_status);
+  const meta = PROMPT_STATUS_META[status];
+  const sourceUrl = safeHref(
+    post.source_url && !post.source_url.startsWith("promptfeed://")
+      ? post.source_url
+      : null,
+  );
 
   const parsedJson = useMemo(() => tryParseJson(post.prompt), [post.prompt]);
   const isJson = parsedJson !== null;
@@ -123,67 +134,129 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
       </div>
 
       <aside className="flex min-w-0 flex-col overflow-hidden border-l bg-surface">
-        <DetailHeader post={post} />
+        <DetailHeader post={post} status={status} />
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 px-5 py-5">
           <div className="shrink-0">
-            <Field label="Model">
-              <div className="flex items-center gap-2">
-                <ModelBadge slug={post.model_slug} size={22} />
-                <span className="text-[14px] font-semibold text-text">
-                  {prettyModel(post.model_slug)}
-                </span>
-              </div>
-            </Field>
+            {status === "reference" ? (
+              <Field label="Content type">
+                <PromptStatusBadge status={status} tone="tinted" />
+              </Field>
+            ) : (
+              <Field label="Model">
+                <div className="flex items-center gap-2">
+                  <ModelBadge slug={post.model_slug} size={22} />
+                  <span className="text-[14px] font-semibold text-text">
+                    {prettyModel(post.model_slug)}
+                  </span>
+                </div>
+              </Field>
+            )}
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-2">
-            <div className="flex items-center justify-between">
+          {status === "reference" ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
-                Prompt
+                {meta.heading}
               </div>
-              {isJson ? (
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
-                  <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
-                  JSON
-                </span>
-              ) : null}
-            </div>
-            {isJson ? (
-              <pre
-                className="min-h-0 flex-1 overflow-auto rounded-[10px] border bg-surface-2 p-3 font-mono text-[12px] leading-[1.55] text-text"
-                style={{ WebkitOverflowScrolling: "touch" }}
-              >
-                {JSON.stringify(parsedJson, null, 2)}
-              </pre>
-            ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto rounded-[10px] border bg-surface-2 p-3">
-                <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-text">
-                  {post.prompt}
-                </p>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={copyPrompt}
-                className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
-              >
-                <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
-                Copy prompt
-              </button>
-              {isJson ? (
+              <PromptNotShared status={status} />
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={copyPromptAsJson}
+                  onClick={() => toggleSave(post)}
                   className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
                 >
-                  <Braces className="h-3.5 w-3.5" strokeWidth={1.8} />
-                  Copy as JSON
+                  <Bookmark className="h-3.5 w-3.5" strokeWidth={1.8} />
+                  Save reference
                 </button>
-              ) : null}
+                {sourceUrl ? (
+                  <a
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    Open source
+                  </a>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-label">
+                    {meta.heading}
+                  </div>
+                  {status === "estimated" && meta.caveat ? (
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full border px-2 py-[1px] text-[10px] font-semibold",
+                        meta.tintedClass,
+                      )}
+                    >
+                      {meta.caveat}
+                    </span>
+                  ) : null}
+                </div>
+                {isJson ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
+                    <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
+                    JSON
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-[11.5px] leading-[1.45] text-text-subtle">
+                {meta.helper}
+              </p>
+              {isJson ? (
+                <pre
+                  className="min-h-0 flex-1 overflow-auto rounded-[10px] border bg-surface-2 p-3 font-mono text-[12px] leading-[1.55] text-text"
+                  style={{ WebkitOverflowScrolling: "touch" }}
+                >
+                  {JSON.stringify(parsedJson, null, 2)}
+                </pre>
+              ) : (
+                <div className="min-h-0 flex-1 overflow-y-auto rounded-[10px] border bg-surface-2 p-3">
+                  <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-text">
+                    {post.prompt}
+                  </p>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={copyPrompt}
+                  className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+                >
+                  <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
+                  {meta.copyLabel}
+                </button>
+                {isJson ? (
+                  <button
+                    type="button"
+                    onClick={copyPromptAsJson}
+                    className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+                  >
+                    <Braces className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    Copy as JSON
+                  </button>
+                ) : null}
+                {status === "estimated" && sourceUrl ? (
+                  <a
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-[8px] border bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-hover hover:text-text"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    Open source
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          )}
 
           <div className="flex shrink-0 flex-wrap items-center gap-2 border-y py-3">
             <ToggleStat
@@ -236,7 +309,7 @@ export function PromptDetailView({ post, owner, ownerSocials = [] }: Props) {
   );
 }
 
-function DetailHeader({ post }: { post: Post }) {
+function DetailHeader({ post, status }: { post: Post; status: PromptStatus }) {
   // Header always links to the original source post — never to the
   // creator's profile, even when external_creator_url is present.
   const sourceUrl = safeHref(
@@ -288,6 +361,11 @@ function DetailHeader({ post }: { post: Post }) {
           <span>{timeAgo(post.posted_at)}</span>
         </div>
       </div>
+      <PromptStatusBadge
+        status={status}
+        tone="tinted"
+        className="mt-0.5 shrink-0"
+      />
     </div>
   );
 }

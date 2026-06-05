@@ -16,16 +16,19 @@ import {
   Image as ImageIcon,
   Film,
   ChevronDown,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
   Model,
   Platform,
   Profile,
+  PromptStatus,
   SocialAccount,
   TagsByAxis,
 } from "@/types/domain";
-import { MIN_TAGS_PER_POST } from "@/types/domain";
+import { MIN_TAGS_PER_POST, PROMPT_STATUSES } from "@/types/domain";
+import { PROMPT_STATUS_META } from "@/lib/prompt-status";
 import { TagAxisPicker } from "./tag-axis-picker";
 import { createClient } from "@/lib/supabase/browser";
 import { ModelBadge } from "@/lib/model-icon";
@@ -121,6 +124,7 @@ export function AddPromptDialog({
   const router = useRouter();
   const [mediaType, setMediaType] = useState<MediaTypeSel>("image");
   const [promptType, setPromptType] = useState<PromptType>("standard");
+  const [promptStatus, setPromptStatus] = useState<PromptStatus>("verified");
 
   const [result, setResult] = useState<FileSlot>(EMPTY_SLOT);
   const [source, setSource] = useState<FileSlot>(EMPTY_SLOT);
@@ -331,6 +335,7 @@ export function AddPromptDialog({
     setSlugTouched(false);
     setCreatorUrl("");
     setPromptType("standard");
+    setPromptStatus("verified");
     setMediaType("image");
     setVideoUrl("");
     setVideoIsI2V(false);
@@ -428,13 +433,16 @@ export function AddPromptDialog({
         return;
       }
     }
-    if (prompt.trim().length < 6) {
-      setError("Prompt must be at least 6 characters.");
-      return;
-    }
-    if (prompt.length > PROMPT_MAX) {
-      setError(`Prompt exceeds ${PROMPT_MAX} characters.`);
-      return;
+    // Visual References carry no prompt — every other tier requires one.
+    if (promptStatus !== "reference") {
+      if (prompt.trim().length < 6) {
+        setError("Prompt must be at least 6 characters.");
+        return;
+      }
+      if (prompt.length > PROMPT_MAX) {
+        setError(`Prompt exceeds ${PROMPT_MAX} characters.`);
+        return;
+      }
     }
     if (!modelSlug || !platformSlug) {
       setError("Pick a model and a platform.");
@@ -507,6 +515,7 @@ export function AddPromptDialog({
       // title/slug, but the regenerated types now require them NOT NULL. We
       // always send the previewed values; the trigger still appends `-2`,
       // `-3` … suffixes to slug on collision.
+      const isReference = promptStatus === "reference";
       const finalTitle = (titleTouched ? title.trim() : previewTitle).slice(
         0,
         TITLE_MAX_LEN,
@@ -535,15 +544,17 @@ export function AddPromptDialog({
         media_url: mainMediaUrl,
         media_type: mediaType,
         thumbnail_url: thumbnailUrl,
-        prompt: prompt.trim(),
-        title: finalTitle || "Untitled prompt",
-        slug: finalSlug || "prompt",
+        prompt: isReference ? "" : prompt.trim(),
+        title:
+          finalTitle || (isReference ? "Visual reference" : "Untitled prompt"),
+        slug: finalSlug || (isReference ? "visual-reference" : "prompt"),
         model_slug: modelSlug,
         platform_slug: platformSlug,
         source_user: sourceUserLabel,
         source_url: sourceLinkForPost,
         posted_at: new Date().toISOString(),
         prompt_type: mediaType === "video" ? "standard" : promptType,
+        prompt_status: promptStatus,
         source_image_url: sourceImageUrl,
         extra_image_urls: extraUrls,
         external_creator_handle: extCreatorHandle,
@@ -621,8 +632,10 @@ export function AddPromptDialog({
       if (!safeVideoSrc(videoUrl)) return false;
       if (videoIsI2V && !slotIsFilled(source)) return false;
     }
-    if (prompt.trim().length < 6) return false;
-    if (prompt.length > PROMPT_MAX) return false;
+    if (promptStatus !== "reference") {
+      if (prompt.trim().length < 6) return false;
+      if (prompt.length > PROMPT_MAX) return false;
+    }
     if (!modelSlug || !platformSlug) return false;
     if (tagSlugs.size < MIN_TAGS_PER_POST) return false;
     if (!parsedCreator) return false;
@@ -631,6 +644,7 @@ export function AddPromptDialog({
     mediaType,
     result,
     promptType,
+    promptStatus,
     source,
     videoUrl,
     videoIsI2V,
@@ -851,52 +865,125 @@ export function AddPromptDialog({
 
               <div className="h-px w-full bg-border" />
 
+              {/* Prompt status — classifies the prompt's provenance/trust. */}
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2 text-[12px] font-medium text-text-muted">
-                  <span className="flex items-center gap-2">
-                    Prompt<span className="text-red-500">*</span>
-                    {isJson ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
-                        <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
-                        JSON
-                      </span>
-                    ) : null}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {isJson ? (
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-label">
+                  Prompt status
+                </span>
+                <div
+                  role="radiogroup"
+                  aria-label="Prompt status"
+                  className="grid grid-cols-3 gap-1.5"
+                >
+                  {PROMPT_STATUSES.map((s) => {
+                    const meta = PROMPT_STATUS_META[s];
+                    const active = promptStatus === s;
+                    return (
                       <button
+                        key={s}
                         type="button"
-                        onClick={beautifyPrompt}
-                        className="text-[11px] font-medium text-text-muted underline-offset-2 hover:text-text hover:underline"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setPromptStatus(s)}
+                        className={cn(
+                          "inline-flex items-center justify-center gap-1.5 rounded-[8px] border px-2 py-1.5 text-[12px] font-medium transition-colors",
+                          active
+                            ? meta.tintedClass
+                            : "border-border bg-surface text-text-muted hover:bg-hover hover:text-text",
+                        )}
                       >
-                        Beautify
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "h-1.5 w-1.5 shrink-0 rounded-full",
+                            meta.dotClass,
+                          )}
+                        />
+                        <span className="truncate">{meta.label}</span>
                       </button>
-                    ) : null}
-                    <span
-                      className={cn(
-                        "tabular-nums text-[11px]",
-                        promptNearLimit ? "text-amber-500" : "text-text-subtle",
-                        promptCount > PROMPT_MAX && "text-red-500",
-                      )}
-                    >
-                      {promptCount} / {PROMPT_MAX}
-                    </span>
-                  </div>
+                    );
+                  })}
                 </div>
-                <textarea
-                  ref={textareaRef}
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  maxLength={PROMPT_MAX + 100}
-                  rows={6}
-                  spellCheck={!isJson}
-                  placeholder={'Cinematic photograph of a cat astronaut…\n\nor JSON, e.g.:\n{ "subject": "cat", "lighting": "rim, cool" }'}
-                  className={cn(
-                    "resize-y rounded-[10px] border bg-surface px-3.5 py-2.5 text-[13px] leading-[1.55] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30 sm:min-h-[212px]",
-                    isJson && "font-mono text-[12.5px]",
-                  )}
-                />
+                <p className="text-[11px] leading-[1.4] text-text-subtle">
+                  {PROMPT_STATUS_META[promptStatus].helper}
+                </p>
               </div>
+
+              {promptStatus === "reference" ? (
+                <div className="flex items-start gap-2 rounded-[10px] border border-dashed bg-surface-2/60 px-3 py-2.5 text-[12px] leading-[1.5] text-text-muted">
+                  <EyeOff
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-subtle"
+                    strokeWidth={1.8}
+                  />
+                  <span>
+                    Visual references don&rsquo;t include a prompt. We&rsquo;ll
+                    save the image with attribution — no prompt is published or
+                    copyable.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2 text-[12px] font-medium text-text-muted">
+                    <span className="flex items-center gap-2">
+                      {promptStatus === "estimated"
+                        ? "Estimated prompt"
+                        : "Prompt"}
+                      <span className="text-red-500">*</span>
+                      {isJson ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-[1px] text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-600">
+                          <Braces className="h-2.5 w-2.5" strokeWidth={2.2} />
+                          JSON
+                        </span>
+                      ) : null}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {isJson ? (
+                        <button
+                          type="button"
+                          onClick={beautifyPrompt}
+                          className="text-[11px] font-medium text-text-muted underline-offset-2 hover:text-text hover:underline"
+                        >
+                          Beautify
+                        </button>
+                      ) : null}
+                      <span
+                        className={cn(
+                          "tabular-nums text-[11px]",
+                          promptNearLimit
+                            ? "text-amber-500"
+                            : "text-text-subtle",
+                          promptCount > PROMPT_MAX && "text-red-500",
+                        )}
+                      >
+                        {promptCount} / {PROMPT_MAX}
+                      </span>
+                    </div>
+                  </div>
+                  <textarea
+                    ref={textareaRef}
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    maxLength={PROMPT_MAX + 100}
+                    rows={6}
+                    spellCheck={!isJson}
+                    placeholder={
+                      promptStatus === "estimated"
+                        ? "Approximate prompt Feedlens estimated from the image…"
+                        : 'Cinematic photograph of a cat astronaut…\n\nor JSON, e.g.:\n{ "subject": "cat", "lighting": "rim, cool" }'
+                    }
+                    className={cn(
+                      "resize-y rounded-[10px] border bg-surface px-3.5 py-2.5 text-[13px] leading-[1.55] text-text placeholder:text-text-subtle focus:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/30 sm:min-h-[212px]",
+                      isJson && "font-mono text-[12.5px]",
+                    )}
+                  />
+                  {promptStatus === "estimated" ? (
+                    <p className="text-[11px] leading-[1.4] text-text-subtle">
+                      Shown to users as an estimate — never as the creator&rsquo;s
+                      original prompt.
+                    </p>
+                  ) : null}
+                </div>
+              )}
 
               {/* Title + URL slug — collapsed by default. They auto-derive
                   from the prompt body, so most submissions never need to
